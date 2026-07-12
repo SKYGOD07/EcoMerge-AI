@@ -6,7 +6,8 @@ import { PanelLeft } from "lucide-react";
 
 const PDFChatViewer = dynamic(() => import("./PDFChatViewer"), { ssr: false });
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const _isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (_isVercel ? '' : 'http://localhost:8000');
 
 interface FileData {
   key: string;

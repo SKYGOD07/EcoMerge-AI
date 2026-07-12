@@ -4,17 +4,22 @@ import React, { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiService } from "@/lib/api";
 import { 
-  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, AreaChart, Area
 } from "recharts";
 import { gsap } from "gsap";
 import { 
   MdAdd, 
-  MdCo2, 
-  MdReceiptLong, 
   MdCheckCircle, 
   MdFilterAlt,
-  MdAttachMoney
+  MdClose,
+  MdTrendingDown,
+  MdArrowDownward,
+  MdFactory,
+  MdElectricBolt,
+  MdDirectionsCar,
+  MdDescription,
+  MdAutorenew
 } from "react-icons/md";
 import { message } from "antd";
 
@@ -31,10 +36,26 @@ interface CarbonEntry {
   evidence: string;
 }
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-[#0c0e16]/95 backdrop-blur-xl border border-white/10 rounded-xl px-4 py-3 shadow-2xl relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent"></div>
+      <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1">{label}</p>
+      {payload.map((p: any, i: number) => (
+        <p key={i} className="text-sm font-bold drop-shadow-md" style={{ color: p.color || '#fff' }}>
+          {typeof p.value === 'number' ? p.value.toLocaleString() : p.value}
+          <span className="text-slate-500 text-xs ml-1 font-medium">{p.name || ''}</span>
+        </p>
+      ))}
+    </div>
+  );
+};
+
 export default function EnvironmentalPage() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [messageApi, contextHolder] = message.useMessage();
   
-  // Fetch carbon summary
   const { data: carbon, isLoading } = useQuery({
     queryKey: ["carbonSummary"],
     queryFn: () => apiService.getCarbonSummary(),
@@ -50,8 +71,6 @@ export default function EnvironmentalPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterScope, setFilterScope] = useState("All");
-  
-  // New entry form state
   const [newDept, setNewDept] = useState("Operations");
   const [newActivity, setNewActivity] = useState("");
   const [newScope, setNewScope] = useState("Scope 1");
@@ -62,18 +81,42 @@ export default function EnvironmentalPage() {
 
   useEffect(() => {
     if (!isLoading) {
-      gsap.fromTo(".env-animate", 
-        { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.7, stagger: 0.08, ease: "power2.out" }
-      );
+      const ctx = gsap.context(() => {
+        gsap.fromTo(".env-card", 
+          { opacity: 0, y: 30, scale: 0.95 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.9, stagger: 0.08, ease: "elastic.out(1, 0.75)" }
+        );
+        gsap.fromTo(".env-section",
+          { opacity: 0, y: 25 },
+          { opacity: 1, y: 0, duration: 0.8, stagger: 0.1, ease: "power3.out", delay: 0.2 }
+        );
+
+        gsap.utils.toArray('.kpi-icon-wrap').forEach((el: any) => {
+          gsap.to(el, {
+            y: -3,
+            duration: 2 + Math.random(),
+            yoyo: true,
+            repeat: -1,
+            ease: "sine.inOut"
+          });
+        });
+
+      }, containerRef);
+      return () => ctx.revert();
     }
   }, [isLoading]);
 
   if (isLoading) {
     return (
-      <div className="flex h-[70vh] flex-col items-center justify-center space-y-4">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent"></div>
-        <p className="text-slate-400 text-sm animate-pulse">Calculating Scope weights...</p>
+      <div className="flex h-[75vh] flex-col items-center justify-center">
+        <div className="relative">
+          <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ping opacity-50 blur-sm"></div>
+          <div className="h-16 w-16 rounded-2xl border border-white/10 glass-panel flex items-center justify-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/10 to-transparent"></div>
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-400"></div>
+          </div>
+        </div>
+        <p className="text-emerald-400/80 text-xs font-bold mt-6 tracking-widest uppercase animate-pulse">Calculating Emissions...</p>
       </div>
     );
   }
@@ -81,7 +124,7 @@ export default function EnvironmentalPage() {
   const handleAddEntry = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newActivity || !newQty || !newFactor) {
-      message.error("Please fill in all required fields");
+      messageApi.error("Please fill in all required fields");
       return;
     }
 
@@ -104,158 +147,200 @@ export default function EnvironmentalPage() {
 
     setEntries([entry, ...entries]);
     setIsModalOpen(false);
-    message.success("Carbon transactions ledger successfully logged!");
-    
-    // Clear form
+    messageApi.success("Carbon entry logged successfully");
     setNewActivity("");
     setNewQty("");
     setNewFactor("");
     setNewEvidence("");
   };
 
-  const filteredEntries = filterScope === "All" 
-    ? entries 
-    : entries.filter(e => e.scope === filterScope);
+  const filteredEntries = filterScope === "All" ? entries : entries.filter(e => e.scope === filterScope);
 
-  // Pie chart data for Scope weights
   const scopeData = [
-    { name: "Scope 1 (Direct)", value: carbon?.scope_1 || 320.4, color: "#10b981" },
-    { name: "Scope 2 (Indirect)", value: carbon?.scope_2 || 410.8, color: "#6366f1" },
-    { name: "Scope 3 (Supply Chain)", value: carbon?.scope_3 || 549.3, color: "#ec4899" },
+    { name: "Scope 1", value: carbon?.scope_1 || 320.4, color: "#10b981" },
+    { name: "Scope 2", value: carbon?.scope_2 || 410.8, color: "#06b6d4" },
+    { name: "Scope 3", value: carbon?.scope_3 || 549.3, color: "#8b5cf6" },
   ];
 
+  const totalEmissions = carbon?.total_kgco2e || 1280.5;
+
+  const scopeIcons: Record<string, React.ReactNode> = {
+    "Scope 1": <MdFactory size={16} />,
+    "Scope 2": <MdElectricBolt size={16} />,
+    "Scope 3": <MdDirectionsCar size={16} />,
+  };
+
+  const getScopeGradient = (scopeName: string) => {
+    if (scopeName === "Scope 1") return "from-emerald-500 to-emerald-400";
+    if (scopeName === "Scope 2") return "from-cyan-500 to-cyan-400";
+    if (scopeName === "Scope 3") return "from-violet-500 to-fuchsia-400";
+    return "from-slate-500 to-slate-400";
+  };
+
+  const getScopeBg = (scopeName: string) => {
+    if (scopeName === "Scope 1") return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+    if (scopeName === "Scope 2") return "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
+    if (scopeName === "Scope 3") return "bg-violet-500/10 text-violet-400 border-violet-500/20";
+    return "bg-slate-500/10 text-slate-400 border-slate-500/20";
+  };
+
   return (
-    <div ref={containerRef} className="space-y-8">
+    <div ref={containerRef} className="space-y-6 relative z-10">
+      {contextHolder}
+      
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Environmental Ledger</h1>
-          <p className="text-slate-400 text-sm mt-1">Audit-ready carbon transactions database and Scope 1, 2, 3 accounting.</p>
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 pb-4">
+        <div className="relative">
+          <div className="absolute -left-4 top-2 w-1 h-8 rounded-r-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+          <h1 className="text-3xl md:text-[32px] font-extrabold tracking-tight text-white leading-tight">
+            Environmental
+          </h1>
+          <p className="text-slate-400 text-[14px] mt-1.5 font-medium">
+            Carbon accounting across Scope 1, 2, 3 with audit-ready tracking
+          </p>
         </div>
+        
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 hover:opacity-90 active:scale-[0.98] transition cursor-pointer"
+          className="self-start md:self-auto flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-2.5 text-[13px] font-bold text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer hover-lift group"
         >
-          <MdAdd size={18} />
+          <MdAdd size={18} className="group-hover:rotate-90 transition-transform duration-300" />
           <span>Log Carbon Entry</span>
         </button>
       </div>
 
-      {/* Metric Cards Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Total Emissions Card */}
-        <div className="env-animate rounded-xl border border-white/5 bg-slate-900/40 p-6 backdrop-blur-md">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total CO2 Emissions</span>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{carbon?.total_kgco2e || 1280.5}</span>
-            <span className="text-slate-500 text-xs font-semibold">kgCO2e</span>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Total Emissions */}
+        <div className="env-card group glass-panel-strong rounded-3xl p-6 relative overflow-hidden hover-lift hover:border-emerald-500/30">
+          <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-emerald-500/10 blur-[50px] group-hover:bg-emerald-500/20 transition-all duration-700"></div>
+          <div className="relative z-10">
+            <span className="text-[11px] font-bold text-slate-400 tracking-wider uppercase">Total Emissions</span>
+            <div className="mt-4 flex items-end gap-1.5">
+              <span className="text-[38px] font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400 leading-none tracking-tight">{totalEmissions.toLocaleString()}</span>
+              <span className="text-slate-500 text-sm font-bold mb-1.5">kgCO2e</span>
+            </div>
+            <div className="mt-4 flex items-center gap-2 bg-emerald-500/5 px-2.5 py-1.5 rounded-lg border border-emerald-500/10 w-max">
+              <MdTrendingDown size={14} className="text-emerald-400" />
+              <span className="text-[11px] font-bold text-emerald-400">-8.3% vs prior cycle</span>
+            </div>
           </div>
-          <p className="mt-2 text-xs font-medium text-emerald-400">Stable from prior cycle</p>
         </div>
 
-        {/* Scope 1 */}
-        <div className="env-animate rounded-xl border border-white/5 bg-slate-900/40 p-6 backdrop-blur-md border-l-4 border-l-emerald-500">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Scope 1 (Direct)</span>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{carbon?.scope_1 || 320.4}</span>
-            <span className="text-slate-500 text-xs font-semibold">kgCO2e</span>
-          </div>
-          <p className="mt-2 text-xs text-slate-400">Diesel and thermal combustion</p>
-        </div>
-
-        {/* Scope 2 */}
-        <div className="env-animate rounded-xl border border-white/5 bg-slate-900/40 p-6 backdrop-blur-md border-l-4 border-l-indigo-500">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Scope 2 (Indirect)</span>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{carbon?.scope_2 || 410.8}</span>
-            <span className="text-slate-500 text-xs font-semibold">kgCO2e</span>
-          </div>
-          <p className="mt-2 text-xs text-slate-400">Grid electricity import</p>
-        </div>
-
-        {/* Scope 3 */}
-        <div className="env-animate rounded-xl border border-white/5 bg-slate-900/40 p-6 backdrop-blur-md border-l-4 border-l-pink-500">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Scope 3 (Up/Down)</span>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{carbon?.scope_3 || 549.3}</span>
-            <span className="text-slate-500 text-xs font-semibold">kgCO2e</span>
-          </div>
-          <p className="mt-2 text-xs text-slate-400">Commutes and office materials</p>
-        </div>
+        {/* Scope Cards */}
+        {scopeData.map((s, i) => {
+          const colorBase = s.name === "Scope 1" ? "emerald" : s.name === "Scope 2" ? "cyan" : "violet";
+          return (
+            <div key={s.name} className={`env-card group glass-panel-strong rounded-3xl p-6 relative overflow-hidden hover-lift hover:border-${colorBase}-500/30`}>
+              <div className={`absolute top-0 right-0 w-32 h-32 rounded-full bg-${colorBase}-500/10 blur-[50px] group-hover:bg-${colorBase}-500/20 transition-all duration-700`}></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[11px] font-bold text-slate-400 tracking-wider uppercase">{s.name}</span>
+                  <div className={`kpi-icon-wrap relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-${colorBase}-500/20 to-${colorBase}-500/5 text-${colorBase}-400 border border-${colorBase}-500/20 shadow-[0_0_10px_rgba(var(--${colorBase}-500-rgb),0.2)]`}>
+                    {scopeIcons[s.name]}
+                  </div>
+                </div>
+                <div className="flex items-end gap-1.5">
+                  <span className="text-[32px] font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400 leading-none tracking-tight">{s.value.toLocaleString()}</span>
+                  <span className="text-slate-500 text-[11px] font-bold mb-1.5">kgCO2e</span>
+                </div>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="flex-1 bg-white/[0.04] rounded-full h-2 overflow-hidden shadow-inner">
+                    <div className="h-full rounded-full transition-all duration-1000 relative" style={{ width: `${(s.value / totalEmissions) * 100}%`, backgroundColor: s.color }}>
+                      <div className="absolute inset-0 bg-white/20 animate-shimmer"></div>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-400">{((s.value / totalEmissions) * 100).toFixed(0)}%</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Visual Analysis Chart */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Scope breakdown pie chart */}
-        <div className="env-animate rounded-xl border border-white/5 bg-slate-900/20 p-6 backdrop-blur-md">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6">Scope Contribution</h3>
-          <div className="h-64 flex justify-center items-center">
+      {/* Charts */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        {/* Scope breakdown donut */}
+        <div className="env-section glass-panel-strong rounded-3xl p-6 lg:col-span-2 relative overflow-hidden group">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-white/[0.02] rounded-full blur-[40px] -z-10 group-hover:bg-white/[0.04] transition-colors duration-1000"></div>
+          
+          <h3 className="text-[15px] font-bold text-white mb-6">Scope Contribution</h3>
+          <div className="h-56 flex justify-center items-center relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
-                  data={scopeData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
+                <Pie 
+                  data={scopeData} 
+                  cx="50%" 
+                  cy="50%" 
+                  innerRadius={65} 
+                  outerRadius={90} 
+                  paddingAngle={6} 
+                  dataKey="value" 
+                  strokeWidth={0}
+                  cornerRadius={6}
                 >
                   {scopeData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{ 
-                    backgroundColor: "#0f172a", 
-                    borderColor: "rgba(255,255,255,0.1)",
-                    borderRadius: "8px",
-                    color: "#fff"
-                  }}
-                />
+                <Tooltip content={<CustomTooltip />} />
               </PieChart>
             </ResponsiveContainer>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="text-center">
+                <span className="block text-[20px] font-extrabold text-white">100%</span>
+                <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider">Total</span>
+              </div>
+            </div>
           </div>
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-3">
             {scopeData.map((s) => (
-              <div key={s.name} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }}></div>
-                  <span className="text-slate-300 font-medium">{s.name}</span>
+              <div key={s.name} className="flex items-center justify-between text-[12px] p-2 rounded-xl hover:bg-white/[0.02] transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="h-3 w-3 rounded-full shadow-sm" style={{ backgroundColor: s.color, boxShadow: `0 0 10px ${s.color}66` }}></div>
+                  <span className="text-slate-300 font-semibold">{s.name}</span>
                 </div>
-                <span className="font-bold text-white">{((s.value / (carbon?.total_kgco2e || 1280.5)) * 100).toFixed(1)}%</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-white">{s.value.toLocaleString()}</span>
+                  <span className="text-[11px] text-slate-500 font-bold bg-white/[0.04] px-2 py-0.5 rounded-md">{((s.value / totalEmissions) * 100).toFixed(1)}%</span>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Scope allocation across departments */}
-        <div className="env-animate rounded-xl border border-white/5 bg-slate-900/20 p-6 backdrop-blur-md lg:col-span-2">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-6">Department Scope Allocation</h3>
-          <div className="h-72 w-full">
+        {/* Dept scope allocation stacked bar */}
+        <div className="env-section glass-panel-strong rounded-3xl p-6 lg:col-span-3 relative overflow-hidden group">
+          <div className="absolute bottom-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-[80px] -z-10 group-hover:bg-emerald-500/10 transition-colors duration-1000"></div>
+          
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-[15px] font-bold text-white">Department Allocation</h3>
+              <p className="text-[12px] text-slate-400 font-medium mt-1">Scope breakdown across business units</p>
+            </div>
+            <button className="text-slate-500 hover:text-white p-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] transition-colors">
+              <MdAutorenew size={16} />
+            </button>
+          </div>
+          <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={[
                   { name: "Operations", Scope1: 180, Scope2: 240, Scope3: 190 },
-                  { name: "Administration", Scope1: 60, Scope2: 120, Scope3: 130 },
-                  { name: "People", Scope1: 80.4, Scope2: 50.8, Scope3: 229.3 }
+                  { name: "Admin", Scope1: 60, Scope2: 120, Scope3: 130 },
+                  { name: "People", Scope1: 80.4, Scope2: 50.8, Scope3: 229.3 },
+                  { name: "Logistics", Scope1: 140, Scope2: 95, Scope3: 180 },
                 ]}
                 margin={{ top: 10, right: 10, left: -25, bottom: 5 }}
+                barSize={32}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
-                <YAxis stroke="#64748b" fontSize={11} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ 
-                    backgroundColor: "#0f172a", 
-                    borderColor: "rgba(255,255,255,0.1)",
-                    borderRadius: "8px",
-                    color: "#fff"
-                  }}
-                />
-                <Bar dataKey="Scope1" stackId="a" fill="#10b981" />
-                <Bar dataKey="Scope2" stackId="a" fill="#6366f1" />
-                <Bar dataKey="Scope3" stackId="a" fill="#ec4899" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <XAxis dataKey="name" stroke="#475569" fontSize={11} tickLine={false} axisLine={false} dy={10} />
+                <YAxis stroke="#475569" fontSize={11} tickLine={false} axisLine={false} dx={-10} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
+                <Bar dataKey="Scope1" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Scope2" stackId="a" fill="#06b6d4" />
+                <Bar dataKey="Scope3" stackId="a" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -263,67 +348,73 @@ export default function EnvironmentalPage() {
       </div>
 
       {/* Carbon Ledger Table */}
-      <div className="env-animate rounded-xl border border-white/5 bg-slate-900/20 p-6 backdrop-blur-md">
+      <div className="env-section glass-panel-strong rounded-3xl p-6 relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Carbon Ledger Database</h3>
+          <div>
+            <h3 className="text-[15px] font-bold text-white">Carbon Ledger</h3>
+            <p className="text-[12px] text-slate-400 font-medium mt-1">Transaction-level emissions database</p>
+          </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400">
-              <MdFilterAlt />
-              <span>Scope:</span>
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+              <MdFilterAlt size={14} />
+              <span className="font-bold uppercase tracking-wider">Filter:</span>
             </div>
-            <select
-              value={filterScope}
-              onChange={(e) => setFilterScope(e.target.value)}
-              className="rounded-lg border border-white/10 bg-slate-950 px-3 py-1.5 text-xs text-white outline-none transition focus:border-emerald-500/50"
-            >
-              <option value="All">All Scopes</option>
-              <option value="Scope 1">Scope 1</option>
-              <option value="Scope 2">Scope 2</option>
-              <option value="Scope 3">Scope 3</option>
-            </select>
+            <div className="flex gap-1.5 p-1 bg-white/[0.02] rounded-xl border border-white/[0.04]">
+              {["All", "Scope 1", "Scope 2", "Scope 3"].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setFilterScope(s)}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer
+                    ${filterScope === s 
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]' 
+                      : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04] border border-transparent'}
+                  `}
+                >{s}</button>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
+        <div className="overflow-x-auto rounded-2xl border border-white/[0.04] bg-[#0c0e16]/50">
+          <table className="w-full text-left border-collapse text-[13px]">
             <thead>
-              <tr className="border-b border-white/5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                <th className="pb-3.5 pl-4">Activity Date</th>
-                <th className="pb-3.5">Department</th>
-                <th className="pb-3.5">Activity Description</th>
-                <th className="pb-3.5 text-center">Class</th>
-                <th className="pb-3.5 text-right">Telemetry</th>
-                <th className="pb-3.5 text-right">Factor</th>
-                <th className="pb-3.5 text-right">Score (kgCO2e)</th>
-                <th className="pb-3.5 text-center pr-4">Evidence</th>
+              <tr className="border-b border-white/[0.06] bg-white/[0.02]">
+                <th className="py-4 pl-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date</th>
+                <th className="py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Department</th>
+                <th className="py-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Activity</th>
+                <th className="py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">Scope</th>
+                <th className="py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quantity</th>
+                <th className="py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wider pr-4">kgCO2e</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5 font-medium text-slate-200">
+            <tbody className="divide-y divide-white/[0.04]">
               {filteredEntries.map((e) => (
-                <tr key={e.id} className="hover:bg-white/5 transition">
-                  <td className="py-3.5 pl-4 text-xs font-semibold text-slate-400">{e.date}</td>
-                  <td>{e.department}</td>
-                  <td className="text-slate-300 font-semibold">{e.activity_type}</td>
-                  <td className="text-center">
-                    <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      e.scope === "Scope 1" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
-                      e.scope === "Scope 2" ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" :
-                      "bg-pink-500/10 text-pink-400 border border-pink-500/20"
-                    }`}>
+                <tr key={e.id} className="hover:bg-white/[0.03] transition-colors group">
+                  <td className="py-4 pl-4 text-slate-500 font-medium whitespace-nowrap">{e.date}</td>
+                  <td className="py-4 text-slate-300 font-semibold">{e.department}</td>
+                  <td className="py-4 text-slate-200 font-bold">{e.activity_type}</td>
+                  <td className="py-4 text-center">
+                    <span className={`inline-flex items-center justify-center min-w-[80px] text-[10px] font-bold px-2.5 py-1 rounded-lg border ${getScopeBg(e.scope)} shadow-sm`}>
                       {e.scope}
                     </span>
                   </td>
-                  <td className="text-right text-slate-400">{e.quantity} <span className="text-[10px] uppercase font-bold">{e.unit}</span></td>
-                  <td className="text-right text-slate-400">{e.emission_factor}</td>
-                  <td className="text-right text-white font-extrabold">{e.kgco2e.toLocaleString()}</td>
-                  <td className="text-center pr-4">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md px-2 py-0.5">
-                      <MdCheckCircle size={12} />
-                      <span>Verified</span>
+                  <td className="py-4 text-right text-slate-400 font-medium">
+                    {e.quantity.toLocaleString()} <span className="text-[10px] uppercase font-bold text-slate-600 ml-0.5">{e.unit}</span>
+                  </td>
+                  <td className="py-4 text-right pr-4">
+                    <span className="font-bold text-white bg-white/[0.04] px-2.5 py-1 rounded-lg border border-white/[0.04]">
+                      {e.kgco2e.toLocaleString()}
                     </span>
                   </td>
                 </tr>
               ))}
+              {filteredEntries.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-500 font-medium">
+                    No carbon entries found for this scope.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -331,32 +422,36 @@ export default function EnvironmentalPage() {
 
       {/* Log Entry Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 p-8 shadow-2xl animate-in fade-in zoom-in duration-200">
-            <h3 className="text-lg font-bold text-white mb-2">Log Carbon Transaction</h3>
-            <p className="text-xs text-slate-400 mb-6">Commit a verified carbon impact ledger record directly into the ERP registry.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-[#06080f]/80 backdrop-blur-xl" onClick={() => setIsModalOpen(false)}></div>
+          <div className="relative w-full max-w-lg rounded-3xl border border-white/[0.08] glass-panel-strong p-8 shadow-2xl overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-cyan-500"></div>
             
-            <form onSubmit={handleAddEntry} className="space-y-4">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="text-lg font-bold text-white">Log Carbon Entry</h3>
+                <p className="text-[12px] text-slate-400 mt-1">Add a verified emission record to the ERP ledger</p>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-white p-2 rounded-xl hover:bg-white/[0.05] transition cursor-pointer active:scale-95">
+                <MdClose size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleAddEntry} className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">Department</label>
-                  <select
-                    value={newDept}
-                    onChange={(e) => setNewDept(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2.5 text-xs text-white outline-none focus:border-emerald-500/50"
-                  >
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Department</label>
+                  <select value={newDept} onChange={(e) => setNewDept(e.target.value)}
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#0c0e16]/80 px-4 py-3 text-[13px] text-white outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all">
                     <option value="Operations">Operations</option>
                     <option value="Administration">Administration</option>
                     <option value="People">People / HR</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">Scope Class</label>
-                  <select
-                    value={newScope}
-                    onChange={(e) => setNewScope(e.target.value)}
-                    className="w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2.5 text-xs text-white outline-none focus:border-emerald-500/50"
-                  >
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Scope Class</label>
+                  <select value={newScope} onChange={(e) => setNewScope(e.target.value)}
+                    className="w-full rounded-xl border border-white/[0.08] bg-[#0c0e16]/80 px-4 py-3 text-[13px] text-white outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all">
                     <option value="Scope 1">Scope 1 - Direct</option>
                     <option value="Scope 2">Scope 2 - Indirect</option>
                     <option value="Scope 3">Scope 3 - Supply Chain</option>
@@ -365,80 +460,45 @@ export default function EnvironmentalPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">Activity Description</label>
-                <input
-                  type="text"
-                  value={newActivity}
-                  onChange={(e) => setNewActivity(e.target.value)}
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Activity</label>
+                <input type="text" value={newActivity} onChange={(e) => setNewActivity(e.target.value)}
                   placeholder="e.g. Flight travel LHR to JFK"
-                  className="w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2.5 text-xs text-white outline-none focus:border-emerald-500/50"
-                  required
-                />
+                  className="w-full rounded-xl border border-white/[0.08] bg-[#0c0e16]/80 px-4 py-3 text-[13px] text-white placeholder-slate-600 outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all" required />
               </div>
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">Telemetry Quantity</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={newQty}
-                    onChange={(e) => setNewQty(e.target.value)}
-                    placeholder="e.g. 1200"
-                    className="w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2.5 text-xs text-white outline-none focus:border-emerald-500/50"
-                    required
-                  />
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Quantity</label>
+                  <input type="number" step="any" value={newQty} onChange={(e) => setNewQty(e.target.value)}
+                    placeholder="1200" className="w-full rounded-xl border border-white/[0.08] bg-[#0c0e16]/80 px-4 py-3 text-[13px] text-white placeholder-slate-600 outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all" required />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">Unit</label>
-                  <input
-                    type="text"
-                    value={newUnit}
-                    onChange={(e) => setNewUnit(e.target.value)}
-                    placeholder="e.g. km"
-                    className="w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2.5 text-xs text-white outline-none focus:border-emerald-500/50"
-                    required
-                  />
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Unit</label>
+                  <input type="text" value={newUnit} onChange={(e) => setNewUnit(e.target.value)}
+                    placeholder="km" className="w-full rounded-xl border border-white/[0.08] bg-[#0c0e16]/80 px-4 py-3 text-[13px] text-white placeholder-slate-600 outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all" required />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">Emission Factor</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={newFactor}
-                    onChange={(e) => setNewFactor(e.target.value)}
-                    placeholder="e.g. 0.18"
-                    className="w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2.5 text-xs text-white outline-none focus:border-emerald-500/50"
-                    required
-                  />
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Emission Factor</label>
+                  <input type="number" step="any" value={newFactor} onChange={(e) => setNewFactor(e.target.value)}
+                    placeholder="0.18" className="w-full rounded-xl border border-white/[0.08] bg-[#0c0e16]/80 px-4 py-3 text-[13px] text-white placeholder-slate-600 outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all" required />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">Evidence Attachment</label>
-                  <input
-                    type="text"
-                    value={newEvidence}
-                    onChange={(e) => setNewEvidence(e.target.value)}
-                    placeholder="invoice_receipt.pdf"
-                    className="w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2.5 text-xs text-white outline-none focus:border-emerald-500/50"
-                  />
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Evidence</label>
+                  <input type="text" value={newEvidence} onChange={(e) => setNewEvidence(e.target.value)}
+                    placeholder="receipt.pdf" className="w-full rounded-xl border border-white/[0.08] bg-[#0c0e16]/80 px-4 py-3 text-[13px] text-white placeholder-slate-600 outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all" />
                 </div>
               </div>
 
-              <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-white/5">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="rounded-lg border border-white/10 px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white"
-                >
+              <div className="mt-8 flex justify-end gap-3 pt-6 border-t border-white/[0.06]">
+                <button type="button" onClick={() => setIsModalOpen(false)}
+                  className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-6 py-2.5 text-[13px] font-bold text-slate-300 hover:text-white hover:bg-white/[0.06] transition-all cursor-pointer">
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
-                >
+                <button type="submit"
+                  className="rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-6 py-2.5 text-[13px] font-bold text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer">
                   Log Transaction
                 </button>
               </div>

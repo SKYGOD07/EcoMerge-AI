@@ -43,8 +43,3 @@ Thumbs.db
 .idea/
 .claude/
 .gemini/
-
-# Databases
-*.db
-ecosphere.db
-

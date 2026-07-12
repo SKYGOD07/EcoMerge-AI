@@ -2,7 +2,12 @@
  * ESG Backend API Service
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+// On Vercel the API is at the same origin — use relative URLs.
+// Only fall back to localhost for local dev.
+const isServer = typeof window === 'undefined';
+const isBrowser = !isServer;
+const isVercel = isBrowser && window.location.hostname.includes('vercel.app');
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isVercel ? '' : 'http://localhost:8000');
 
 // ESG ERP Platform Types
 export interface LoginResponse {
@@ -10,6 +15,15 @@ export interface LoginResponse {
   token_type: string;
   role: string;
   email: string;
+  full_name?: string;
+}
+
+export interface RegisterResponse {
+  access_token: string;
+  token_type: string;
+  role: string;
+  email: string;
+  full_name: string;
 }
 
 export interface DepartmentScore {
@@ -175,6 +189,14 @@ class APIService {
     return this.fetchWithError<LoginResponse>(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       body: JSON.stringify(credentials),
+    });
+  }
+
+  // Auth register — for original company login
+  async register(data: { email: string; password: string; full_name: string; role?: string }): Promise<RegisterResponse> {
+    return this.fetchWithError<RegisterResponse>(`${API_BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 
