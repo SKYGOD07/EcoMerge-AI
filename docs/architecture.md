@@ -1,40 +1,32 @@
 # EcoSphere Architecture
 
-EcoSphere is structured as a local-first ERP-style ESG platform with a clean separation between presentation, API, business logic, and persistence.
+EcoSphere is a local-first ESG ERP application. The architecture keeps the user interface, API layer, business logic, and database responsibilities separate so the hackathon demo can stay clear and extendable.
 
-## System shape
+## Runtime Shape
 
-- Frontend: Next.js + TypeScript + Tailwind + shadcn-style UI primitives
-- Backend: FastAPI with modular routes, controllers, services, and repositories
-- Database: PostgreSQL running locally via Docker Compose
-- Security: JWT authentication with role-based access control
-- AI: advisory only, layered over ERP records and business workflows
+- `frontend/`: Next.js dashboard for login, ESG KPIs, department views, carbon tracking, CSR, governance, rewards, reports, alerts, and admin settings.
+- `backend/app/api/routes/`: FastAPI route modules grouped by business capability.
+- `backend/app/controllers/`: request orchestration.
+- `backend/app/services/`: business logic and mock/demo service responses.
+- `backend/app/core/`: JWT, RBAC, and configuration.
+- `backend/migrations/`: PostgreSQL schema baseline.
 
-## Runtime layers
+## Local Services
 
-### Frontend
-The frontend acts as the operational workspace for people, departments, carbon tracking, governance, reports, and alerts. It is designed to present business-ready KPIs and task flows rather than a research pipeline.
+- PostgreSQL runs locally through Docker Compose.
+- FastAPI runs on `http://localhost:8000`.
+- Next.js runs on `http://localhost:3001`.
+- The frontend reads `NEXT_PUBLIC_API_BASE_URL` and falls back to demo data if the API is offline.
 
-### Backend API
-The backend hosts a FastAPI application that exposes role-aware endpoints for login, dashboard summaries, governance, reports, and AI guidance. It is intentionally modular so the ERP foundation can grow without becoming monolithic.
+## Security
 
-### Data layer
-The application relies on PostgreSQL for master data, ESG transactions, audit records, notifications, and report metadata. The schema baseline is stored under the migrations folder and seeded for demo usage.
+JWT authentication and RBAC are built around four roles:
 
-## Security model
+- `admin`: users, settings, and master data
+- `manager`: department workflows and reporting
+- `employee`: ESG action entry and policy acknowledgement
+- `auditor`: governance, evidence, and compliance review
 
-The platform uses JWT tokens and an RBAC guard. Supported roles:
-- admin
-- manager
-- employee
-- auditor
+## AI Boundary
 
-This allows the app to separate operational control, department oversight, employee data entry, and auditor review.
-
-## AI role
-
-AI is kept secondary. It is used to provide recommendations based on existing ERP data so the platform remains grounded in recorded business activity instead of becoming a pure document intelligence product.
-
-## Delivery principle
-
-EcoSphere should feel like a lightweight ESG ERP suite for hackathon evaluation: local-first, role-aware, operational, and easy to explain in product terms.
+EcoSphere may include AI recommendations, but the product is not an AI demo. AI should read operational records and suggest next actions while the ERP workflows remain the primary experience.
