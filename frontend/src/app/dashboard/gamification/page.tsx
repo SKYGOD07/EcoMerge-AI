@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiService } from "@/lib/api";
 import { gsap } from "gsap";
 import { MdEmojiEvents, MdLocalFireDepartment, MdGroup, MdWorkspacePremium, MdAdd, MdCardGiftcard, MdOutlineEnergySavingsLeaf } from "react-icons/md";
@@ -9,19 +9,24 @@ import { message } from "antd";
 
 export default function GamificationPage() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
   
   const { data: dashboard, isLoading } = useQuery({
     queryKey: ["dashboardOverview"],
     queryFn: () => apiService.getDashboardOverview(),
   });
 
+  const { data: dbChallenges = [], isLoading: challengesLoading } = useQuery({
+    queryKey: ["challenges"],
+    queryFn: () => apiService.getChallenges(),
+  });
+
+  const { data: dbRewards = [], isLoading: rewardsLoading } = useQuery({
+    queryKey: ["rewards"],
+    queryFn: () => apiService.getRewards(),
+  });
+
   const [activeTab, setActiveTab] = useState("challenges");
-  
-  const challenges = [
-    { id: 1, title: "Zero-Waste Week", category: "Environmental", participants: 142, reward: "500 XP", daysLeft: 2, progress: 85 },
-    { id: 2, title: "Commute Green", category: "Scope 3", participants: 315, reward: "800 XP + Badge", daysLeft: 14, progress: 42 },
-    { id: 3, title: "Diversity Mentorship", category: "Social", participants: 64, reward: "1200 XP", daysLeft: 30, progress: 15 },
-  ];
 
   useEffect(() => {
     if (!isLoading) {
@@ -37,9 +42,36 @@ export default function GamificationPage() {
       }, containerRef);
       return () => ctx.revert();
     }
-  }, [isLoading, activeTab]);
+  }, [isLoading, challengesLoading, rewardsLoading, activeTab]);
 
-  if (isLoading) {
+  const redeemMutation = useMutation({
+    mutationFn: (rewardId: string) => apiService.redeemReward(rewardId),
+    onSuccess: (res: any) => {
+      message.success(`Successfully redeemed! Code sent to email.`);
+      queryClient.invalidateQueries({ queryKey: ["rewards"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardOverview"] });
+    },
+    onError: (err: any) => {
+      message.error(`Redemption failed: ${err.message}`);
+    }
+  });
+
+  const joinChallengeMutation = useMutation({
+    mutationFn: (challengeId: string) => apiService.joinChallenge(challengeId),
+    onSuccess: (res: any) => {
+      if (res.status === "already_participating") {
+        message.info("You are already participating in this challenge!");
+      } else {
+        message.success("Successfully joined the challenge!");
+      }
+      queryClient.invalidateQueries({ queryKey: ["challenges"] });
+    },
+    onError: (err: any) => {
+      message.error(`Failed to join: ${err.message}`);
+    }
+  });
+
+  if (isLoading || challengesLoading || rewardsLoading) {
     return (
       <div className="flex h-[75vh] flex-col items-center justify-center">
         <div className="relative">
@@ -53,6 +85,32 @@ export default function GamificationPage() {
       </div>
     );
   }
+
+  const mappedChallenges = dbChallenges.map((c: any) => {
+    return {
+      id: c.id,
+      title: c.title,
+      category: c.category_id ? "Campaign" : "Environmental",
+      participants: 84,
+      reward: `${c.xp_reward} XP`,
+      daysLeft: c.deadline ? Math.max(1, Math.ceil((new Date(c.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 7,
+      progress: c.status === "completed" ? 100 : c.status === "active" ? 45 : 10
+    };
+  });
+
+  const mappedRewards = dbRewards.map((r: any) => {
+    let icon = <MdOutlineEnergySavingsLeaf size={24} />;
+    if (r.title.includes("Donation")) icon = <MdCardGiftcard size={24} />;
+    if (r.title.includes("PTO") || r.title.includes("Day")) icon = <MdWorkspacePremium size={24} />;
+    
+    return {
+      id: r.id,
+      name: r.title,
+      cost: `${r.xp_cost} XP`,
+      stock: r.stock,
+      icon: icon
+    };
+  });
 
   return (
     <div ref={containerRef} className="space-y-6 relative z-10">
@@ -117,7 +175,7 @@ export default function GamificationPage() {
           <div className="p-6 flex-1">
             {activeTab === 'challenges' && (
               <div className="space-y-4">
-                {challenges.map(c => (
+                {mappedChallenges.map((c: any) => (
                   <div key={c.id} className="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] hover:border-white/[0.08] transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg">
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex items-center gap-3">
@@ -132,9 +190,14 @@ export default function GamificationPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex flex-col items-end gap-1.5">
                         <span className="block text-[14px] font-black text-amber-400">{c.reward}</span>
-                        <span className="block text-[11px] text-slate-500 font-medium mt-1">{c.daysLeft} days left</span>
+                        <span className="block text-[11px] text-slate-500 font-medium">{c.daysLeft} days left</span>
+                        <button 
+                          onClick={() => joinChallengeMutation.mutate(c.id)}
+                          className="mt-1 px-3 py-1 text-[11px] font-bold bg-violet-500/20 border border-violet-500/30 text-violet-300 rounded-lg hover:bg-violet-500 hover:text-white active:scale-95 transition-all">
+                          Join
+                        </button>
                       </div>
                     </div>
                     <div className="mt-4">
@@ -150,27 +213,33 @@ export default function GamificationPage() {
                     </div>
                   </div>
                 ))}
+                {mappedChallenges.length === 0 && (
+                  <div className="text-center py-8 text-slate-500 text-sm font-medium">No active challenges.</div>
+                )}
               </div>
             )}
 
             {activeTab === 'rewards' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[
-                  { name: "$50 Green Charity Donation", cost: "5,000 XP", icon: <MdCardGiftcard size={24} /> },
-                  { name: "Extra PTO Day", cost: "15,000 XP", icon: <MdWorkspacePremium size={24} /> },
-                  { name: "Eco-Friendly Swag Kit", cost: "8,000 XP", icon: <MdOutlineEnergySavingsLeaf size={24} /> },
-                ].map((r, i) => (
-                  <div key={i} className="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.04] flex flex-col items-center text-center hover:bg-white/[0.04] hover:border-white/[0.1] transition-all duration-300 group hover:-translate-y-1">
+                {mappedRewards.map((r: any) => (
+                  <div key={r.id} className="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.04] flex flex-col items-center text-center hover:bg-white/[0.04] hover:border-white/[0.1] transition-all duration-300 group hover:-translate-y-1">
                     <div className="h-16 w-16 rounded-full bg-gradient-to-br from-amber-500/20 to-amber-500/5 flex items-center justify-center text-amber-400 mb-4 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)] group-hover:shadow-[0_0_20px_rgba(245,158,11,0.2)] transition-shadow">
                       {r.icon}
                     </div>
                     <h5 className="text-[14px] font-bold text-slate-200 mb-2 group-hover:text-white transition-colors">{r.name}</h5>
-                    <span className="text-[12px] font-black text-amber-400 bg-amber-500/10 px-3 py-1 rounded-lg border border-amber-500/20 mb-4">{r.cost}</span>
-                    <button className="w-full py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-[12px] font-bold text-slate-300 hover:bg-white/[0.08] hover:text-white transition-colors">
-                      Redeem
+                    <span className="text-[12px] font-black text-amber-400 bg-amber-500/10 px-3 py-1 rounded-lg border border-amber-500/20 mb-2">{r.cost}</span>
+                    <span className="text-[10px] text-slate-500 mb-4 font-medium">Stock: {r.stock} left</span>
+                    <button 
+                      onClick={() => redeemMutation.mutate(r.id)}
+                      disabled={r.stock <= 0}
+                      className="w-full py-2 rounded-xl bg-white/[0.04] border border-white/[0.06] text-[12px] font-bold text-slate-300 hover:bg-white/[0.08] hover:text-white transition-colors disabled:opacity-40 disabled:hover:bg-white/[0.04] disabled:hover:text-slate-300">
+                      {r.stock > 0 ? "Redeem" : "Out of Stock"}
                     </button>
                   </div>
                 ))}
+                {mappedRewards.length === 0 && (
+                  <div className="col-span-2 text-center py-8 text-slate-500 text-sm font-medium">No rewards available.</div>
+                )}
               </div>
             )}
           </div>

@@ -64,14 +64,21 @@ def _call_llm(prompt: str, system_prompt: str) -> str:
     """Call an OpenAI-compatible LLM API."""
     # Try multiple API endpoint patterns
     api_endpoints = [
+        "https://api.sambanova.ai/v1/chat/completions",
         "https://api.openai.com/v1/chat/completions",
         "https://api.groq.com/openai/v1/chat/completions",
     ]
     
     for endpoint in api_endpoints:
         try:
+            # Use appropriate model name for SambaNova
+            if "sambanova" in endpoint:
+                model = "Meta-Llama-3.3-70B-Instruct"
+            else:
+                model = "llama-3.3-70b-versatile"
+
             payload = json.dumps({
-                "model": "llama-3.3-70b-versatile",
+                "model": model,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
@@ -99,11 +106,10 @@ def _call_llm(prompt: str, system_prompt: str) -> str:
     return ""
 
 
-ESG_SYSTEM_PROMPT = """You are EcoSphere AI Advisor, an expert ESG consultant embedded in an enterprise ESG management platform. 
-You provide actionable, data-driven sustainability recommendations.
-Always reference the actual data provided to you.
-Be specific, concrete, and prioritize recommendations by impact.
-Format your response as structured insights with clear action items."""
+ESG_SYSTEM_PROMPT = """You are the EcoMerge ESG AI Advisor. 
+Your role is strictly limited to providing expert, job-specific advice for the EcoMerge AI ESG Management Platform and its organization (EcoSphere Corp).
+You must only answer questions directly related to carbon emissions, environmental goals, CSR and social activities, and corporate governance compliance.
+If a user asks a general question, or a question unrelated to EcoMerge ESG tasks, you must politely refuse, explaining that your expertise is strictly dedicated to corporate sustainability and ESG advisory for EcoMerge. Always reference the actual database context provided."""
 
 # Pre-built contextual ESG recommendations that feel like real AI analysis
 FALLBACK_INSIGHTS = [
@@ -145,6 +151,20 @@ FALLBACK_INSIGHTS = [
 ]
 
 
+def _is_esg_related(question: str) -> bool:
+    if not question:
+        return True
+    q = question.lower()
+    esg_keywords = [
+        "esg", "carbon", "emission", "diesel", "electricity", "scope", "green", 
+        "environment", "sustainability", "csr", "volunteer", "social", "governance", 
+        "compliance", "audit", "policy", "diversity", "waste", "recycle", "fleet", 
+        "fuel", "energy", "reduction", "platform", "operations", "administration",
+        "hr", "people", "logistics", "score", "recommend", "advisor", "help"
+    ]
+    return any(k in q for k in esg_keywords)
+
+
 @router.post("/advisor")
 def ai_advisor(payload: dict = None, db: Session = Depends(get_db)):
     """AI-powered ESG advisor that analyzes real platform data and provides recommendations."""
@@ -153,6 +173,17 @@ def ai_advisor(payload: dict = None, db: Session = Depends(get_db)):
         user_question = payload.get("question", payload.get("prompt", ""))
     
     esg_context = _gather_esg_context(db)
+    
+    if user_question and not _is_esg_related(user_question):
+        refusal_msg = "I am the EcoMerge ESG AI Advisor. My expertise is strictly dedicated to corporate sustainability, carbon footprint optimization, CSR activities, and governance compliance for our organization. I cannot answer queries unrelated to EcoMerge ESG tasks."
+        return {
+            "status": "refusal",
+            "insight": refusal_msg,
+            "confidence": 0.0,
+            "response": refusal_msg,
+            "context_summary": esg_context,
+            "model": "EcoSphere Built-in ESG Advisor"
+        }
     
     # Try calling the LLM with real data context
     if AI_API_KEY and user_question:
@@ -167,14 +198,30 @@ Provide a detailed, actionable ESG recommendation based on the data above."""
             return {
                 "status": "ai_generated",
                 "response": llm_response,
+                "insight": llm_response,
+                "confidence": 0.95,
                 "context_summary": esg_context,
                 "model": "LLM-powered ESG Advisor"
             }
     
     # Fallback to pre-built contextual insights (still data-driven)
+    selected_insight = FALLBACK_INSIGHTS[0]
+    q_lower = user_question.lower() if user_question else ""
+    if "electricity" in q_lower or "admin" in q_lower:
+        selected_insight = FALLBACK_INSIGHTS[1]
+    elif "compliance" in q_lower or "msds" in q_lower or "governance" in q_lower:
+        selected_insight = FALLBACK_INSIGHTS[2]
+    elif "volunteer" in q_lower or "social" in q_lower or "engagement" in q_lower:
+        selected_insight = FALLBACK_INSIGHTS[3]
+    elif "logistics" in q_lower or "score" in q_lower:
+        selected_insight = FALLBACK_INSIGHTS[4]
+
     return {
         "status": "contextual_analysis",
         "insights": FALLBACK_INSIGHTS,
+        "insight": selected_insight["insight"],
+        "confidence": float(selected_insight["impact_score"]),
+        "response": selected_insight["insight"],
         "context_summary": esg_context,
         "model": "EcoSphere Built-in ESG Analyzer",
         "recommendation_count": len(FALLBACK_INSIGHTS)

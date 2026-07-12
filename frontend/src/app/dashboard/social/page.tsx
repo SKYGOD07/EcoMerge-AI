@@ -5,6 +5,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { gsap } from "gsap";
 import { MdAdd, MdVolunteerActivism, MdDiversity3, MdSchool, MdHourglassTop, MdCheckCircle, MdClose, MdPeople, MdArrowForward } from "react-icons/md";
 import { message } from "antd";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiService } from "@/lib/api";
 
 interface CSRActivity {
   id: string;
@@ -32,48 +34,119 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function SocialPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [messageApi, contextHolder] = message.useMessage();
-  
-  const [activities, setActivities] = useState<CSRActivity[]>([
-    { id: "1", title: "Global Hunger Charity Run", category: "Community Outreach", volunteer_hours: 320, funds_raised: "$12,500", participation_rate: 68, status: "Completed" },
-    { id: "2", title: "Carbon Forestry Volunteering", category: "Environmental", volunteer_hours: 480, funds_raised: "$5,000", participation_rate: 42, status: "In Progress" },
-    { id: "3", title: "ESG Compliance Workshop Q3", category: "Education", volunteer_hours: 150, funds_raised: "N/A", participation_rate: 91, status: "Completed" },
-    { id: "4", title: "Tech Mentoring for Underrepresented Students", category: "Social Equity", volunteer_hours: 240, funds_raised: "N/A", participation_rate: 25, status: "In Progress" },
-  ]);
+  const queryClient = useQueryClient();
+
+  const { data: dbActivities = [], isLoading } = useQuery({
+    queryKey: ["socialActivities"],
+    queryFn: () => apiService.getSocialActivities(),
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["settings_categories"],
+    queryFn: async () => {
+      const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isVercel ? '' : "http://localhost:8000");
+      const res = await fetch(`${API_BASE_URL}/api/settings/categories`);
+      if (!res.ok) throw new Error("Failed to load categories");
+      return res.json();
+    }
+  });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("Community Outreach");
   const [newHours, setNewHours] = useState("");
   const [newFunds, setNewFunds] = useState("");
-  const [newRate, setNewRate] = useState("");
+  const [newRate, setNewRate] = useState("50");
   const [newStatus, setNewStatus] = useState<"Completed" | "In Progress" | "Scheduled">("Scheduled");
 
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      gsap.fromTo(".social-card", 
-        { opacity: 0, y: 30, scale: 0.95 }, 
-        { opacity: 1, y: 0, scale: 1, duration: 0.9, stagger: 0.08, ease: "elastic.out(1, 0.75)" }
-      );
-      gsap.fromTo(".social-section", 
-        { opacity: 0, y: 25 }, 
-        { opacity: 1, y: 0, duration: 0.8, stagger: 0.1, ease: "power3.out", delay: 0.2 }
-      );
-      gsap.utils.toArray('.kpi-icon-wrap').forEach((el: any) => {
-        gsap.to(el, { y: -3, duration: 2 + Math.random(), yoyo: true, repeat: -1, ease: "sine.inOut" });
-      });
-    }, containerRef);
-    return () => ctx.revert();
-  }, []);
+    const csrCats = categories.filter((c: any) => c.type === "csr");
+    if (csrCats.length > 0 && (!newCategory || !csrCats.some((c: any) => c.name === newCategory))) {
+      setNewCategory(csrCats[0].name);
+    }
+  }, [categories, newCategory]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      const ctx = gsap.context(() => {
+        gsap.fromTo(".social-card", 
+          { opacity: 0, y: 30, scale: 0.95 }, 
+          { opacity: 1, y: 0, scale: 1, duration: 0.9, stagger: 0.08, ease: "elastic.out(1, 0.75)" }
+        );
+        gsap.fromTo(".social-section", 
+          { opacity: 0, y: 25 }, 
+          { opacity: 1, y: 0, duration: 0.8, stagger: 0.1, ease: "power3.out", delay: 0.2 }
+        );
+        gsap.utils.toArray('.kpi-icon-wrap').forEach((el: any) => {
+          gsap.to(el, { y: -3, duration: 2 + Math.random(), yoyo: true, repeat: -1, ease: "sine.inOut" });
+        });
+      }, containerRef);
+      return () => ctx.revert();
+    }
+  }, [isLoading]);
+
+  const addActivityMutation = useMutation({
+    mutationFn: (newAct: any) => apiService.createSocialActivity(newAct),
+    onSuccess: () => {
+      messageApi.success("CSR activity logged successfully");
+      queryClient.invalidateQueries({ queryKey: ["socialActivities"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardOverview"] });
+      setIsModalOpen(false);
+      setNewTitle("");
+      setNewHours("");
+      setNewFunds("");
+      setNewRate("50");
+      setNewStatus("Scheduled");
+    },
+    onError: (err: any) => {
+      messageApi.error(`Error logging CSR activity: ${err.message}`);
+    }
+  });
 
   const handleAddActivity = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !newHours || !newRate) { messageApi.error("Please fill in all required fields"); return; }
-    const activity: CSRActivity = { id: (activities.length + 1).toString(), title: newTitle, category: newCategory, volunteer_hours: parseInt(newHours), funds_raised: newFunds || "N/A", participation_rate: parseInt(newRate), status: newStatus };
-    setActivities([activity, ...activities]);
-    setIsModalOpen(false);
-    messageApi.success("CSR activity logged successfully");
-    setNewTitle(""); setNewHours(""); setNewFunds(""); setNewRate(""); setNewStatus("Scheduled");
+    const catObj = categories.find((c: any) => c.name === newCategory);
+    addActivityMutation.mutate({
+      title: newTitle,
+      category_id: catObj ? catObj.id : undefined,
+      description: newTitle,
+      volunteer_hours_est: parseInt(newHours),
+      funds_raised: newFunds || "N/A",
+      points_reward: 50,
+      evidence_required: true,
+      status: newStatus
+    });
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[75vh] flex-col items-center justify-center">
+        <div className="relative">
+          <div className="absolute inset-0 rounded-full border border-violet-500/20 animate-ping opacity-50 blur-sm"></div>
+          <div className="h-16 w-16 rounded-2xl border border-white/10 glass-panel flex items-center justify-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-tr from-violet-500/10 to-transparent"></div>
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-400"></div>
+          </div>
+        </div>
+        <p className="text-violet-400/80 text-xs font-bold mt-6 tracking-widest uppercase animate-pulse">Loading CSR metrics...</p>
+      </div>
+    );
+  }
+
+  const mappedActivities = dbActivities.map((act: any) => {
+    const cat = categories.find((c: any) => c.id === act.category_id);
+    return {
+      id: act.id,
+      title: act.title,
+      category: cat ? cat.name : "Community Outreach",
+      volunteer_hours: act.volunteer_hours_est || 0,
+      funds_raised: act.funds_raised || "N/A",
+      participation_rate: 65,
+      status: act.status || "In Progress"
+    };
+  });
 
   const diversityData = [
     { name: "Female", value: 46, color: "#ec4899" },
@@ -201,11 +274,11 @@ export default function SocialPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-[15px] font-bold text-white">CSR & Volunteering Initiatives</h3>
-            <p className="text-[12px] text-slate-400 font-medium mt-1">{activities.length} tracked programs</p>
+            <p className="text-[12px] text-slate-400 font-medium mt-1">{mappedActivities.length} tracked programs</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {activities.map(item => (
+          {mappedActivities.map(item => (
             <div key={item.id} className="rounded-2xl border border-white/[0.04] bg-white/[0.02] p-5 hover:bg-white/[0.05] hover:border-white/[0.1] transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg">
               <div className="flex items-center justify-between mb-4">
                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg border ${catColor(item.category)}`}>{item.category}</span>
@@ -260,10 +333,9 @@ export default function SocialPage() {
                 <div>
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Category</label>
                   <select value={newCategory} onChange={e => setNewCategory(e.target.value)} className="w-full rounded-xl border border-white/[0.08] bg-[#0c0e16]/80 px-4 py-3 text-[13px] text-white outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all">
-                    <option value="Community Outreach">Community Outreach</option>
-                    <option value="Environmental">Environmental</option>
-                    <option value="Education">Education</option>
-                    <option value="Social Equity">Social Equity</option>
+                    {categories.filter((c: any) => c.type === "csr").map((c: any) => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>

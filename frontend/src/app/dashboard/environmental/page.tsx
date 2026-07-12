@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiService } from "@/lib/api";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -56,18 +56,22 @@ export default function EnvironmentalPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [messageApi, contextHolder] = message.useMessage();
   
+  const queryClient = useQueryClient();
+
   const { data: carbon, isLoading } = useQuery({
     queryKey: ["carbonSummary"],
     queryFn: () => apiService.getCarbonSummary(),
   });
 
-  const [entries, setEntries] = useState<CarbonEntry[]>([
-    { id: "1", department: "Operations", activity_type: "Diesel Generator", scope: "Scope 1", quantity: 850, unit: "litres", emission_factor: 2.68, kgco2e: 2278.0, date: "2026-07-10", evidence: "invoice_2024_03.pdf" },
-    { id: "2", department: "Administration", activity_type: "Grid Electricity", scope: "Scope 2", quantity: 4200, unit: "kWh", emission_factor: 0.85, kgco2e: 3570.0, date: "2026-07-09", evidence: "utility_bill_admin.pdf" },
-    { id: "3", department: "Operations", activity_type: "Employee Commute", scope: "Scope 3", quantity: 12400, unit: "km", emission_factor: 0.18, kgco2e: 2232.0, date: "2026-07-08", evidence: "commute_survey.xlsx" },
-    { id: "4", department: "People", activity_type: "Office Paper", scope: "Scope 3", quantity: 120, unit: "kg", emission_factor: 0.95, kgco2e: 114.0, date: "2026-07-05", evidence: "paper_receipt.pdf" },
-    { id: "5", department: "Operations", activity_type: "Natural Gas Heating", scope: "Scope 1", quantity: 620, unit: "m³", emission_factor: 2.03, kgco2e: 1258.6, date: "2026-07-01", evidence: "gas_bill_q2.pdf" },
-  ]);
+  const { data: dbEntries = [], isLoading: entriesLoading } = useQuery({
+    queryKey: ["carbonEntries"],
+    queryFn: () => apiService.getCarbonEntries(),
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ["departments"],
+    queryFn: () => apiService.getDepartments(),
+  });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterScope, setFilterScope] = useState("All");
@@ -80,7 +84,13 @@ export default function EnvironmentalPage() {
   const [newEvidence, setNewEvidence] = useState("");
 
   useEffect(() => {
-    if (!isLoading) {
+    if (departments.length > 0 && !newDept) {
+      setNewDept(departments[0].name);
+    }
+  }, [departments]);
+
+  useEffect(() => {
+    if (!isLoading && !entriesLoading) {
       const ctx = gsap.context(() => {
         gsap.fromTo(".env-card", 
           { opacity: 0, y: 30, scale: 0.95 },
@@ -104,9 +114,9 @@ export default function EnvironmentalPage() {
       }, containerRef);
       return () => ctx.revert();
     }
-  }, [isLoading]);
+  }, [isLoading, entriesLoading]);
 
-  if (isLoading) {
+  if (isLoading || entriesLoading) {
     return (
       <div className="flex h-[75vh] flex-col items-center justify-center">
         <div className="relative">
@@ -121,6 +131,48 @@ export default function EnvironmentalPage() {
     );
   }
 
+  const getScope = (activity: string) => {
+    if (["Diesel Fuel", "Fleet Petrol", "Diesel Generator"].includes(activity)) return "Scope 1";
+    if (activity === "Grid Electricity" || activity === "Electricity Grid" || activity === "Electricity Grid Factor") return "Scope 2";
+    return "Scope 3";
+  };
+
+
+
+  const mappedEntries = dbEntries.map((e: any) => {
+    const dept = departments.find((d: any) => d.id === e.department_id);
+    return {
+      id: e.id,
+      department: dept ? dept.name : "Operations",
+      activity_type: e.activity_type,
+      scope: getScope(e.activity_type),
+      quantity: e.quantity,
+      unit: e.unit,
+      emission_factor: e.emission_factor,
+      kgco2e: e.kgco2e,
+      date: e.created_at ? e.created_at.split("T")[0] : "",
+      evidence: e.evidence_url || "N/A"
+    };
+  });
+
+  const addEntryMutation = useMutation({
+    mutationFn: (newEntry: any) => apiService.createCarbonEntry(newEntry),
+    onSuccess: () => {
+      messageApi.success("Carbon entry logged successfully");
+      queryClient.invalidateQueries({ queryKey: ["carbonEntries"] });
+      queryClient.invalidateQueries({ queryKey: ["carbonSummary"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardOverview"] });
+      setIsModalOpen(false);
+      setNewActivity("");
+      setNewQty("");
+      setNewFactor("");
+      setNewEvidence("");
+    },
+    onError: (err: any) => {
+      messageApi.error(`Error logging carbon entry: ${err.message}`);
+    }
+  });
+
   const handleAddEntry = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newActivity || !newQty || !newFactor) {
@@ -128,33 +180,19 @@ export default function EnvironmentalPage() {
       return;
     }
 
-    const qty = parseFloat(newQty);
-    const factor = parseFloat(newFactor);
-    const kg = qty * factor;
+    const deptObj = departments.find((d: any) => d.name === newDept);
 
-    const entry: CarbonEntry = {
-      id: (entries.length + 1).toString(),
-      department: newDept,
+    addEntryMutation.mutate({
       activity_type: newActivity,
-      scope: newScope,
-      quantity: qty,
+      quantity: parseFloat(newQty),
       unit: newUnit,
-      emission_factor: factor,
-      kgco2e: parseFloat(kg.toFixed(1)),
-      date: new Date().toISOString().split("T")[0],
-      evidence: newEvidence || "receipt_pending.pdf"
-    };
-
-    setEntries([entry, ...entries]);
-    setIsModalOpen(false);
-    messageApi.success("Carbon entry logged successfully");
-    setNewActivity("");
-    setNewQty("");
-    setNewFactor("");
-    setNewEvidence("");
+      emission_factor: parseFloat(newFactor),
+      evidence_url: newEvidence || "receipt_pending.pdf",
+      department_id: deptObj ? deptObj.id : undefined,
+    });
   };
 
-  const filteredEntries = filterScope === "All" ? entries : entries.filter(e => e.scope === filterScope);
+  const filteredEntries = filterScope === "All" ? mappedEntries : mappedEntries.filter(e => e.scope === filterScope);
 
   const scopeData = [
     { name: "Scope 1", value: carbon?.scope_1 || 320.4, color: "#10b981" },
@@ -443,9 +481,9 @@ export default function EnvironmentalPage() {
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Department</label>
                   <select value={newDept} onChange={(e) => setNewDept(e.target.value)}
                     className="w-full rounded-xl border border-white/[0.08] bg-[#0c0e16]/80 px-4 py-3 text-[13px] text-white outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all">
-                    <option value="Operations">Operations</option>
-                    <option value="Administration">Administration</option>
-                    <option value="People">People / HR</option>
+                    {departments.map((d: any) => (
+                      <option key={d.id} value={d.name}>{d.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>

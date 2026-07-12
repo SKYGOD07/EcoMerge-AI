@@ -39,6 +39,7 @@ export interface CarbonTrendPoint {
 export interface LeaderboardUser {
   name: string;
   xp: number;
+  department?: string;
 }
 
 export interface DashboardOverviewResponse {
@@ -79,6 +80,13 @@ export interface ESGReportResponse {
   status: string;
   download_formats: string[];
   summary: string;
+  metrics?: {
+    carbon_total?: number;
+    csr_activities?: number;
+    completed_challenges?: number;
+    policies?: number;
+    open_compliance_issues?: number;
+  };
 }
 
 export interface AIAdvisorResponse {
@@ -236,6 +244,77 @@ class APIService {
       method: 'POST',
       body: JSON.stringify({ prompt: prompt || '' }),
     });
+  }
+
+  // Get carbon entries
+  async getCarbonEntries(): Promise<any[]> {
+    return this.fetchWithError<any[]>(`${API_BASE_URL}/api/carbon/entries`);
+  }
+
+  // Create carbon entry
+  async createCarbonEntry(payload: any): Promise<any> {
+    return this.fetchWithError<any>(`${API_BASE_URL}/api/carbon/entries`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Get social activities
+  async getSocialActivities(): Promise<any[]> {
+    return this.fetchWithError<any[]>(`${API_BASE_URL}/api/social/activities`);
+  }
+
+  // Create social activity
+  async createSocialActivity(payload: any): Promise<any> {
+    return this.fetchWithError<any>(`${API_BASE_URL}/api/social/activities`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Get challenges
+  async getChallenges(): Promise<any[]> {
+    return this.fetchWithError<any[]>(`${API_BASE_URL}/api/gamification/challenges`);
+  }
+
+  // Create challenge
+  async createChallenge(payload: any): Promise<any> {
+    return this.fetchWithError<any>(`${API_BASE_URL}/api/gamification/challenges`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Get rewards
+  async getRewards(): Promise<any[]> {
+    return this.fetchWithError<any[]>(`${API_BASE_URL}/api/gamification/rewards`);
+  }
+
+  // Redeem reward
+  async redeemReward(rewardId: string): Promise<any> {
+    return this.fetchWithError<any>(`${API_BASE_URL}/api/gamification/rewards/${rewardId}/redeem`, {
+      method: 'POST',
+    });
+  }
+
+  // Join challenge
+  async joinChallenge(challengeId: string): Promise<any> {
+    return this.fetchWithError<any>(`${API_BASE_URL}/api/gamification/challenges/${challengeId}/join`, {
+      method: 'POST',
+    });
+  }
+
+  // Complete challenge
+  async completeChallenge(challengeId: string, payload: any): Promise<any> {
+    return this.fetchWithError<any>(`${API_BASE_URL}/api/gamification/challenges/${challengeId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  // Get badges
+  async getBadges(): Promise<any[]> {
+    return this.fetchWithError<any[]>(`${API_BASE_URL}/api/gamification/badges`);
   }
 
   // --- Legacy Report Analysis Methods (Stubs to maintain file references/compiles) ---

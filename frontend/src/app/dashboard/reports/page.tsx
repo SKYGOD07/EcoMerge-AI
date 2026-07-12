@@ -11,7 +11,38 @@ export default function ReportsPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [messageApi, contextHolder] = message.useMessage();
   
-  const { data: reportMeta } = useQuery({ queryKey: ["esgReport"], queryFn: () => apiService.getESGReport() });
+  const { data: esgReportData } = useQuery({
+    queryKey: ["esgReport"],
+    queryFn: () => apiService.getESGReport(),
+  });
+  const reportMeta = esgReportData;
+
+  const { data: envReportData } = useQuery({
+    queryKey: ["envReport"],
+    queryFn: () => {
+      const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isVercel ? '' : "http://localhost:8000");
+      return fetch(`${API_BASE_URL}/api/reports/environmental`).then(res => res.json());
+    }
+  });
+
+  const { data: socialReportData } = useQuery({
+    queryKey: ["socialReport"],
+    queryFn: () => {
+      const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isVercel ? '' : "http://localhost:8000");
+      return fetch(`${API_BASE_URL}/api/reports/social`).then(res => res.json());
+    }
+  });
+
+  const { data: govReportData } = useQuery({
+    queryKey: ["govReport"],
+    queryFn: () => {
+      const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || (isVercel ? '' : "http://localhost:8000");
+      return fetch(`${API_BASE_URL}/api/reports/governance`).then(res => res.json());
+    }
+  });
 
   const [reportType, setReportType] = useState("esg_summary");
   const [period, setPeriod] = useState("q2_2026");
@@ -47,7 +78,54 @@ export default function ReportsPage() {
 
   const handleDownload = () => {
     const filename = `EcoMerge_${reportType}_${period}.${format}`;
-    const content = `EcoMerge AI ESG Report\nType: ${reportType}\nPeriod: ${period}\nGenerated: ${new Date().toISOString()}\nScore: 81.4/100\n`;
+    let content = `==================================================\n`;
+    content += `         ECOSPHERE ENTERPRISE ESG REPORT          \n`;
+    content += `==================================================\n`;
+    content += `Generated: ${new Date().toLocaleString()}\n`;
+    content += `Reporting Period: ${period.toUpperCase()}\n`;
+    content += `GRI & DEFRA Compliant Document\n\n`;
+
+    if (reportType === "esg_summary" && esgReportData) {
+      content += `OVERALL ESG PERFORMANCE SUMMARY:\n`;
+      content += `- ${esgReportData.summary || "Pending general review"}\n\n`;
+      content += `METRICS BREAKDOWN:\n`;
+      content += `- Total Carbon Footprint: ${esgReportData.metrics?.carbon_total || 0} kgCO2e\n`;
+      content += `- Active CSR Programs: ${esgReportData.metrics?.csr_activities || 0}\n`;
+      content += `- Completed Challenges: ${esgReportData.metrics?.completed_challenges || 0}\n`;
+      content += `- Active Policies: ${esgReportData.metrics?.policies || 0}\n`;
+      content += `- Open Compliance Issues: ${esgReportData.metrics?.open_compliance_issues || 0}\n`;
+    } else if (reportType === "environmental" && envReportData) {
+      content += `ENVIRONMENTAL & CARBON LEDGER REPORT:\n`;
+      content += `- Total Footprint: ${envReportData.total_emissions || 0} kgCO2e\n`;
+      content += `- Total Transactions: ${envReportData.entry_count || 0}\n\n`;
+      content += `EMISSIONS BY ACTIVITY TYPE:\n`;
+      Object.entries(envReportData.by_activity || {}).forEach(([activity, kg]: any) => {
+        content += `  * ${activity}: ${kg} kgCO2e\n`;
+      });
+    } else if (reportType === "social" && socialReportData) {
+      content += `SOCIAL & COMMUNITY IMPACT REPORT:\n`;
+      content += `- Volunteer Hours: ${socialReportData.volunteer_hours || 0} hours\n`;
+      content += `- Active Participations: ${socialReportData.csr_participation_count || 0}\n\n`;
+      content += `DIVERSITY ANALYSIS:\n`;
+      content += `  * Female: ${socialReportData.diversity?.female || 0}%\n`;
+      content += `  * Male: ${socialReportData.diversity?.male || 0}%\n`;
+      content += `  * Non-binary: ${socialReportData.diversity?.nonbinary || 0}%\n`;
+    } else if (reportType === "governance" && govReportData) {
+      content += `GOVERNANCE & COMPLIANCE REPORT:\n`;
+      content += `- Active Policy Frameworks: ${govReportData.policies_count || 0}\n`;
+      content += `- Average Audit Score: ${govReportData.average_audit_score || 0}%\n`;
+      content += `- Total Unresolved Issues: ${govReportData.total_compliance_issues || 0}\n\n`;
+      content += `COMPLIANCE ISSUES BY SEVERITY:\n`;
+      Object.entries(govReportData.issues_by_severity || {}).forEach(([severity, count]: any) => {
+        content += `  * ${severity}: ${count} issue(s)\n`;
+      });
+    } else {
+      content += `ESG Data Summary Report\nNo data was loaded for this type.`;
+    }
+
+    content += `\n==================================================\n`;
+    content += `End of Report\n`;
+
     const el = document.createElement("a");
     el.href = URL.createObjectURL(new Blob([content], { type: "text/plain" }));
     el.download = filename;
