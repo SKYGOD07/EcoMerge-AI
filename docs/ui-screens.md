@@ -1,28 +1,39 @@
-# EcoSphere UI Screen Plan
+# EcoSphere UI Screens
 
-The frontend experience should read as a structured ESG ERP dashboard rather than a document-analysis portal.
+The frontend is a working Next.js dashboard at `frontend/`. It presents the product as an ESG operations workspace.
 
-## Principal screens
+## Current Screens and Surfaces
 
-1. Login and role switcher
-2. Dashboard overview
-3. Department performance board
-4. Carbon tracking and evidence entry
-5. Governance and policy acknowledgements
-6. Audit and compliance issue tracker
-7. Rewards, badges, and challenges
-8. Reports and export center
-9. Notification center
-10. Admin settings and master data screens
+- Login/auth shell with seeded local credentials
+- Executive dashboard KPIs
+- Department performance chart
+- Carbon tracking trend and scope breakdown
+- CSR/social activity progress
+- Governance and compliance issue tracker
+- Rewards and leaderboard panel
+- Reports queue
+- Notifications center
+- Settings/admin RBAC panel
 
-## UX expectations
+## Navigation
 
-- clean enterprise layout
-- role-specific views
-- reusable cards, tables, and charts
-- clear permission boundaries
-- calm, operational visual language
+The primary navigation includes:
 
-## Product intent
+- Dashboard
+- Departments
+- Carbon
+- CSR
+- Governance
+- Rewards
+- Reports
+- Alerts
+- Admin
 
-The UI should help internal stakeholders make decisions quickly with high-clarity operational summaries and clear ownership across modules.
+## UI Principles
+
+- Dense but readable enterprise layout
+- Responsive sidebar and mobile module controls
+- shadcn-style primitives for buttons and inputs
+- Recharts for operational charts
+- Dark mode toggle
+- Demo-data fallback when the backend is not running
