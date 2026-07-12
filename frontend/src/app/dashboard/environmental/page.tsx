@@ -73,6 +73,9 @@ export default function EnvironmentalPage() {
     queryFn: () => apiService.getDepartments(),
   });
 
+  const deptList = Array.isArray(departments) ? departments : [];
+  const entriesList = Array.isArray(dbEntries) ? dbEntries : [];
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterScope, setFilterScope] = useState("All");
   const [newDept, setNewDept] = useState("Operations");
@@ -84,11 +87,10 @@ export default function EnvironmentalPage() {
   const [newEvidence, setNewEvidence] = useState("");
 
   useEffect(() => {
-    const deptList = Array.isArray(departments) ? departments : [];
     if (deptList.length > 0 && !newDept) {
       setNewDept(deptList[0].name);
     }
-  }, [departments, newDept]);
+  }, [deptList, newDept]);
 
   useEffect(() => {
     if (!isLoading && !entriesLoading) {
@@ -140,9 +142,6 @@ export default function EnvironmentalPage() {
 
 
 
-  const deptList = Array.isArray(departments) ? departments : [];
-  const entriesList = Array.isArray(dbEntries) ? dbEntries : [];
-
   const mappedEntries = entriesList.map((e: any) => {
     const dept = deptList.find((d: any) => d.id === e.department_id);
     return {
@@ -184,7 +183,7 @@ export default function EnvironmentalPage() {
       return;
     }
 
-    const deptObj = departments.find((d: any) => d.name === newDept);
+    const deptObj = deptList.find((d: any) => d.name === newDept);
 
     addEntryMutation.mutate({
       activity_type: newActivity,
@@ -485,7 +484,7 @@ export default function EnvironmentalPage() {
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Department</label>
                   <select value={newDept} onChange={(e) => setNewDept(e.target.value)}
                     className="w-full rounded-xl border border-white/[0.08] bg-[#0c0e16]/80 px-4 py-3 text-[13px] text-white outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all">
-                    {departments.map((d: any) => (
+                    {deptList.map((d: any) => (
                       <option key={d.id} value={d.name}>{d.name}</option>
                     ))}
                   </select>

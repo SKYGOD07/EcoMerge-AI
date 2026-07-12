@@ -20,7 +20,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/overview")
-def get_dashboard_overview(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_dashboard_overview(range: str = "6M", db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # 1. Active challenges
     active_challenges = db.query(Challenge).filter(Challenge.status == "active").count()
 
@@ -68,26 +68,92 @@ def get_dashboard_overview(db: Session = Depends(get_db), current_user: User = D
     total_dept_score = sum(d["score"] for d in department_scores)
     overall_esg_score = round(total_dept_score / len(department_scores), 1) if department_scores else 81.4
 
-    # 5. Carbon trend (last 6 months)
-    # Fetch entries in the last 180 days and group them by month in python to ensure database dialect independence
-    start_date = datetime.utcnow() - timedelta(days=180)
-    entries = db.query(CarbonEntry).filter(CarbonEntry.created_at >= start_date).all()
+    # 5. Carbon trend
+    now = datetime.utcnow()
     
-    monthly_data = {}
-    for i in range(5, -1, -1):
-        target_month = (datetime.utcnow() - timedelta(days=i * 30))
-        month_name = calendar.month_name[target_month.month][:3]
-        monthly_data[month_name] = 0.0
+    if range == "1W":
+        # Last 7 days, grouped by weekday name
+        start_date = now - timedelta(days=7)
+        entries = db.query(CarbonEntry).filter(CarbonEntry.created_at >= start_date).all()
         
-    for e in entries:
-        month_name = calendar.month_name[e.created_at.month][:3]
-        if month_name in monthly_data:
-            monthly_data[month_name] += float(e.kgco2e)
-
-    carbon_trend = [
-        {"month": m, "kgco2e": round(val, 1)}
-        for m, val in monthly_data.items()
-    ]
+        daily_data = {}
+        for i in range(6, -1, -1):
+            target_day = now - timedelta(days=i)
+            day_label = target_day.strftime("%a")
+            daily_data[day_label] = 0.0
+            
+        for e in entries:
+            day_label = e.created_at.strftime("%a")
+            if day_label in daily_data:
+                daily_data[day_label] += float(e.kgco2e)
+                
+        carbon_trend = [
+            {"month": d, "kgco2e": round(val, 1)}
+            for d, val in daily_data.items()
+        ]
+        
+    elif range == "1M":
+        # Last 30 days, grouped by week
+        start_date = now - timedelta(days=30)
+        entries = db.query(CarbonEntry).filter(CarbonEntry.created_at >= start_date).all()
+        
+        weekly_data = {}
+        for i in range(3, -1, -1):
+            week_label = f"Wk {4-i}"
+            weekly_data[week_label] = 0.0
+            
+        for e in entries:
+            age_days = (now - e.created_at).days
+            week_idx = min(3, age_days // 7)
+            week_label = f"Wk {4-week_idx}"
+            if week_label in weekly_data:
+                weekly_data[week_label] += float(e.kgco2e)
+                
+        carbon_trend = [
+            {"month": w, "kgco2e": round(val, 1)}
+            for w, val in weekly_data.items()
+        ]
+        
+    elif range == "1Y":
+        # Last 12 months, grouped by month name
+        start_date = now - timedelta(days=365)
+        entries = db.query(CarbonEntry).filter(CarbonEntry.created_at >= start_date).all()
+        
+        monthly_data = {}
+        for i in range(11, -1, -1):
+            target_month = now - timedelta(days=i * 30)
+            month_label = calendar.month_name[target_month.month][:3]
+            monthly_data[month_label] = 0.0
+            
+        for e in entries:
+            month_label = calendar.month_name[e.created_at.month][:3]
+            if month_label in monthly_data:
+                monthly_data[month_label] += float(e.kgco2e)
+                
+        carbon_trend = [
+            {"month": m, "kgco2e": round(val, 1)}
+            for m, val in monthly_data.items()
+        ]
+        
+    else: # Default 6M
+        start_date = now - timedelta(days=180)
+        entries = db.query(CarbonEntry).filter(CarbonEntry.created_at >= start_date).all()
+        
+        monthly_data = {}
+        for i in range(5, -1, -1):
+            target_month = now - timedelta(days=i * 30)
+            month_label = calendar.month_name[target_month.month][:3]
+            monthly_data[month_label] = 0.0
+            
+        for e in entries:
+            month_label = calendar.month_name[e.created_at.month][:3]
+            if month_label in monthly_data:
+                monthly_data[month_label] += float(e.kgco2e)
+                
+        carbon_trend = [
+            {"month": m, "kgco2e": round(val, 1)}
+            for m, val in monthly_data.items()
+        ]
 
     return {
         "overall_esg_score": overall_esg_score,

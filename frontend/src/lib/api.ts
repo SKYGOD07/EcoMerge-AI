@@ -209,8 +209,9 @@ class APIService {
   }
 
   // Get dashboard overview
-  async getDashboardOverview(): Promise<DashboardOverviewResponse> {
-    return this.fetchWithError<DashboardOverviewResponse>(`${API_BASE_URL}/api/dashboard/overview`);
+  async getDashboardOverview(range?: string): Promise<DashboardOverviewResponse> {
+    const url = range ? `${API_BASE_URL}/api/dashboard/overview?range=${range}` : `${API_BASE_URL}/api/dashboard/overview`;
+    return this.fetchWithError<DashboardOverviewResponse>(url);
   }
 
   // Get departments

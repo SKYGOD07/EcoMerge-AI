@@ -90,8 +90,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // Search Modal States
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   useEffect(() => {
     setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   useEffect(() => {
@@ -169,11 +184,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: "Overview", path: "/dashboard/overview", icon: <MdDashboard size={18} /> },
     { name: "Environmental", path: "/dashboard/environmental", icon: <MdCo2 size={20} />, badge: "3" },
     { name: "Social & CSR", path: "/dashboard/social", icon: <MdPeople size={18} /> },
-    { name: "Governance", path: "/dashboard/governance", icon: <MdGavel size={18} />, badge: "!" },
+    { name: "Governance", path: "/dashboard/governance", icon: <MdGavel size={18} />, badge: "!", roles: ["admin", "manager", "auditor"] },
     { name: "Gamification", path: "/dashboard/gamification", icon: <MdEmojiEvents size={18} /> },
-    { name: "Reports", path: "/dashboard/reports", icon: <MdAnalytics size={18} /> },
+    { name: "Reports", path: "/dashboard/reports", icon: <MdAnalytics size={18} />, roles: ["admin", "manager", "auditor"] },
     { name: "AI Advisor", path: "/dashboard/ai-assistant", icon: <MdPsychology size={18} /> },
-    { name: "Settings", path: "/dashboard/settings", icon: <MdSettings size={18} /> },
+    { name: "Settings", path: "/dashboard/settings", icon: <MdSettings size={18} />, roles: ["admin"] },
   ];
 
   const handleLogout = () => {
@@ -196,6 +211,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (hour < 17) return "Good afternoon";
     return "Good evening";
   };
+
+  const searchItems = [
+    { name: "Overview Dashboard", path: "/dashboard/overview", description: "Real-time ESG KPIs and carbon forecast trends" },
+    { name: "Environmental Ledger", path: "/dashboard/environmental", description: "Scope 1, 2, 3 carbon accounting, emission factors, and ledger logs" },
+    { name: "Social & CSR", path: "/dashboard/social", description: "Corporate responsibility hours, diversity index, and CSR campaigns" },
+    { name: "Gamification Quests", path: "/dashboard/gamification", description: "Active sustainability quests, leaderboard, and reward store" },
+    { name: "Corporate Governance", path: "/dashboard/governance", description: "Compliance audits, policy acknowledgments, and risk alerts", roles: ["admin", "manager", "auditor"] },
+    { name: "Report Builder", path: "/dashboard/reports", description: "Compile GRI & DEFRA compliant audit-ready reports", roles: ["admin", "manager", "auditor"] },
+    { name: "System Settings", path: "/dashboard/settings", description: "Global emission factors, division codes, and SSO parameters", roles: ["admin"] },
+  ];
+
+  const filteredSearchItems = searchItems
+    .filter(item => !item.roles || item.roles.includes(user.role))
+    .filter(item => 
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   return (
     <div className="flex min-h-screen bg-[#06080f] text-slate-100 selection:bg-emerald-500/30 selection:text-emerald-200">
@@ -239,7 +271,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
           
           <div className="space-y-0.5">
-            {menuItems.map((item) => {
+            {menuItems
+              .filter(item => !item.roles || item.roles.includes(user.role))
+              .map((item) => {
               const isActive = pathname === item.path || (item.path !== '/dashboard/overview' && pathname.startsWith(item.path));
               const isHovered = hoveredNav === item.path;
               return (
@@ -385,7 +419,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="h-4 w-px bg-white/[0.06] mx-1 hidden lg:block" />
 
             {/* Search Trigger */}
-            <button className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-white/[0.06] bg-white/[0.02] text-slate-500 text-xs font-medium hover:border-white/10 hover:bg-white/[0.04] transition-all duration-200 cursor-pointer group">
+            <button 
+              onClick={() => {
+                setSearchQuery("");
+                setSearchOpen(true);
+              }}
+              className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-white/[0.06] bg-white/[0.02] text-slate-500 text-xs font-medium hover:border-white/10 hover:bg-white/[0.04] transition-all duration-200 cursor-pointer group"
+            >
               <MdSearch size={14} className="group-hover:text-emerald-400 transition-colors" />
               <span>Search</span>
               <kbd className="ml-4 hidden lg:inline-flex items-center gap-0.5 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">
@@ -431,7 +471,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               
               {/* Mobile Nav Items */}
               <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-                {menuItems.map((item) => {
+                {menuItems
+                  .filter(item => !item.roles || item.roles.includes(user.role))
+                  .map((item) => {
                   const isActive = pathname === item.path;
                   return (
                     <button
@@ -491,6 +533,61 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </main>
       </div>
+
+      {/* Premium Command Palette Search Modal */}
+      {searchOpen && (
+        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-24 px-4 bg-black/60 backdrop-blur-md animate-fade-in">
+          <div className="absolute inset-0" onClick={() => setSearchOpen(false)}></div>
+          
+          <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#0c0d16] shadow-2xl overflow-hidden flex flex-col max-h-[400px]">
+            {/* Search Input */}
+            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06] bg-white/[0.02]">
+              <MdSearch size={20} className="text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search pages, reports, or settings... (e.g. carbon)"
+                className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none border-none"
+                autoFocus
+              />
+              <button 
+                onClick={() => setSearchOpen(false)}
+                className="text-[10px] bg-white/5 border border-white/10 rounded px-1.5 py-0.5 text-slate-400 font-mono cursor-pointer"
+              >
+                ESC
+              </button>
+            </div>
+
+            {/* Search Results */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-1 select-none">
+              {filteredSearchItems.map((item) => (
+                <div
+                  key={item.path}
+                  onClick={() => {
+                    router.push(item.path);
+                    setSearchOpen(false);
+                    setSearchQuery("");
+                  }}
+                  className="flex flex-col gap-0.5 px-4 py-3 rounded-xl hover:bg-white/[0.04] cursor-pointer group transition-colors"
+                >
+                  <span className="text-[13px] font-bold text-slate-200 group-hover:text-emerald-400 transition-colors">
+                    {item.name}
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    {item.description}
+                  </span>
+                </div>
+              ))}
+              {filteredSearchItems.length === 0 && (
+                <div className="py-8 text-center text-slate-500 text-xs font-medium">
+                  No matching pages or tools found.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

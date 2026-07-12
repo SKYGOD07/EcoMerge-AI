@@ -44,8 +44,8 @@ export default function OverviewPage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { data: dashboard, isLoading: dashLoading, error: dashError } = useQuery({
-    queryKey: ["dashboardOverview"],
-    queryFn: () => apiService.getDashboardOverview(),
+    queryKey: ["dashboardOverview", timeRange],
+    queryFn: () => apiService.getDashboardOverview(timeRange),
   });
 
   const { data: carbon, isLoading: carbonLoading } = useQuery({
