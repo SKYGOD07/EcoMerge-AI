@@ -1,93 +1,61 @@
 # EcoSphere
 
-EcoSphere is a local-first ERP-style ESG operations platform built for the Odoo Hackathon. The repository now centers a structured FastAPI backend, a PostgreSQL foundation, JWT authentication, role-based access control, and a Next.js dashboard that presents business workflows instead of a research-only document-analysis demo.
+EcoSphere is a local-first ERP-style ESG management platform for the Odoo Hackathon. It turns ESG work into operational workflows: departments, users, carbon entries, CSR activity, governance policies, audits, rewards, notifications, and reports.
 
-## Product story
-
-EcoSphere turns ESG management into an operational system:
-- departments and user roles are first-class master data
-- carbon and governance actions are recorded as business transactions
-- auditors review policies and compliance issues through a clear workflow
-- notifications, challenges, and reports keep teams aligned
-- AI remains an advisor layer that reads operational data and returns recommendations, rather than becoming the product itself
-
-## Core modules
-
-- Dashboard overview and KPI monitoring
-- Department management
-- Carbon tracking and emissions summaries
-- Governance policies and acknowledgements
-- Audit and compliance issue workflows
-- Notifications, rewards, and challenge-based engagement
-- Report generation and export
+The repo is now centered on a FastAPI backend, local PostgreSQL, JWT authentication, role-based access control, and a Next.js dashboard frontend. AI is only an advisory layer on top of recorded business data.
 
 ## Stack
 
-Frontend
-- Next.js 15 + TypeScript
-- Tailwind CSS
-- shadcn-style UI foundations
-- Recharts-ready dashboard surface
+- Frontend: Next.js 15, TypeScript, Tailwind CSS, shadcn-style primitives, Recharts
+- Backend: FastAPI, Pydantic, SQLAlchemy-ready structure, JWT auth, RBAC
+- Database: local PostgreSQL through Docker Compose
 
-Backend
-- FastAPI
-- SQLAlchemy + Pydantic
-- JWT authentication
-- RBAC for admin, manager, employee, and auditor roles
-- PostgreSQL via Docker Compose
-
-## Local development
-
-1. Install Python dependencies.
-2. Start PostgreSQL locally:
+## Run Locally
 
 ```bash
-docker compose -f backend/docker-compose.yml up -d
+docker compose up -d
 ```
-
-3. Run the API:
 
 ```bash
 cd backend
+pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-4. Start the frontend:
-
 ```bash
-cd ESG-demo-main/frontend
+cd frontend
 npm install
-npm run dev -- --port 3001
+npm run dev
 ```
 
-## Demo identities
+Open:
 
-Seeded local users:
-- admin@ecomerge.local / admin123
-- manager@ecomerge.local / manager123
-- employee@ecomerge.local / employee123
-- auditor@ecomerge.local / auditor123
+- Frontend: http://localhost:3001
+- Backend API: http://localhost:8000
+- API docs: http://localhost:8000/docs
 
-## Repository layout
+## Demo Users
 
-- backend/app — FastAPI application, routes, controllers, services, and models
-- backend/migrations — PostgreSQL schema baseline
-- backend/seeds — seeded ERP data and role examples
-- ESG-demo-main/frontend — dashboard and workflow UI shell
-- docs — product documentation and implementation brief
+- admin@ecosphere.local / admin123
+- manager@ecosphere.local / manager123
+- employee@ecosphere.local / employee123
+- auditor@ecosphere.local / auditor123
 
-## Documentation index
+## Repository Layout
 
-- docs/architecture.md — system architecture
-- docs/database.md — data model and PostgreSQL schema
-- docs/api.md — API surface and roles
-- docs/feature-mapping.md — operational module alignment
-- docs/ui-screens.md — dashboard and workflow screens
-- docs/roadmap.md — implementation phases
-- docs/setup.md — environment and startup instructions
-- docs/legacy.md — historical research notes preserved for context
+- `frontend/` - EcoSphere dashboard and workflow UI
+- `backend/app/` - FastAPI routes, controllers, services, models, security, and RBAC
+- `backend/migrations/` - PostgreSQL schema baseline
+- `backend/seeds/` - local seed data
+- `docs/` - architecture, setup, API, database, UI, roadmap, and legacy notes
 
-## Product principle
+## Documentation
 
-EcoSphere is intentionally not positioned as a chatbot or research pipeline demo. The user experience is an enterprise-ready, role-aware ESG management workflow with local data ownership and clean operational dashboards.
-
+- [Architecture](docs/architecture.md)
+- [Database](docs/database.md)
+- [API](docs/api.md)
+- [Feature Mapping](docs/feature-mapping.md)
+- [UI Screens](docs/ui-screens.md)
+- [Setup](docs/setup.md)
+- [Roadmap](docs/roadmap.md)
+- [Legacy Notes](docs/legacy.md)
