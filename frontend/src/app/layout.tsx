@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Outfit } from "next/font/google";
 import "./globals.css";
 // import { StagewiseToolbar } from "@stagewise/toolbar-next";
 import { AntdRegistry } from "@/lib/antd";
 import QueryProvider from "@/components/providers/QueryProvider";
 
-const inter = Inter({
+const outfit = Outfit({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-outfit",
 });
 
 export const metadata: Metadata = {
@@ -25,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} antialiased`}>
+      <body className={`${outfit.variable} font-sans antialiased bg-[#030408] text-slate-100`}>
         <QueryProvider>
           <AntdRegistry>
             <div id="root-layout">{children}</div>
