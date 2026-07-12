@@ -1,42 +1,70 @@
 # EcoSphere Setup Guide
 
-## Required local environment
+## Requirements
 
-- Python
-- Node.js
+- Python 3.10+
+- Node.js 18+
 - Docker Compose
-- PostgreSQL container runtime
 
-## Backend startup
+## Environment
+
+Copy the root example if you want local overrides:
+
+```bash
+copy .env.example .env
+```
+
+Frontend API URL:
+
+```bash
+copy frontend\.env.example frontend\.env.local
+```
+
+Default value:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+## Database
+
+```bash
+docker compose up -d
+```
+
+## Backend
 
 ```bash
 cd backend
+pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Database startup
+## Frontend
 
 ```bash
-docker compose -f backend/docker-compose.yml up -d
-```
-
-## Frontend startup
-
-```bash
-cd ESG-demo-main/frontend
+cd frontend
 npm install
-npm run dev -- --port 3001
+npm run dev
 ```
 
-## Default local credentials
+## Local URLs
 
-- admin@ecomerge.local / admin123
-- manager@ecomerge.local / manager123
-- employee@ecomerge.local / employee123
-- auditor@ecomerge.local / auditor123
+- Frontend: http://localhost:3001
+- Backend: http://localhost:8000
+- API docs: http://localhost:8000/docs
 
-## Expected local endpoints
+## Demo Credentials
 
-- frontend: http://localhost:3001
-- backend: http://localhost:8000
-- docs: http://localhost:8000/docs
+- admin@ecosphere.local / admin123
+- manager@ecosphere.local / manager123
+- employee@ecosphere.local / employee123
+- auditor@ecosphere.local / auditor123
+
+## One-Command Helper
+
+After dependencies are installed, this helper starts backend and frontend:
+
+```bash
+python scripts/start_project.py
+```
