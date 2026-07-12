@@ -1,22 +1,31 @@
 # EcoSphere Roadmap
 
-## Phase 1 — Foundation
-- finalize local PostgreSQL + FastAPI foundation
-- align auth, roles, and permission guardrails
-- validate seed data and data model baseline
+## Phase 1: Foundation
 
-## Phase 2 — Core ERP Modules
-- department management
-- carbon summaries and transactions
-- policy and governance review
-- compliance issue workflow
+- Local PostgreSQL baseline
+- FastAPI route structure
+- JWT authentication
+- RBAC roles
+- Next.js dashboard shell
 
-## Phase 3 — Reporting and AI
-- dashboard exports
-- advisory recommendations
-- notifications and activity visibility
+## Phase 2: Core Workflows
 
-## Phase 4 — Delivery Polish
-- improve role-aware screens
-- refine dashboard interaction states
-- align the product story for Odoo submission review
+- Department CRUD
+- Carbon entry creation and evidence fields
+- CSR activity records
+- Policy acknowledgements
+- Compliance issue workflow
+
+## Phase 3: Reporting
+
+- Exportable ESG summaries
+- Carbon activity export
+- Audit evidence register
+- Stakeholder-ready dashboard snapshots
+
+## Phase 4: Demo Polish
+
+- Role-aware frontend states
+- Seed data reset command
+- Form validation and empty states
+- Deployment notes for local and containerized demos
