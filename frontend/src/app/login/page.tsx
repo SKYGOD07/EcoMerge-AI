@@ -11,6 +11,7 @@ import EulerLogo from "@/assets/Euler-Img.svg";
 export default function LoginPage() {
   const router = useRouter();
   const { login, user, loading, error, clearError } = useAuthStore();
+  const [messageApi, contextHolder] = message.useMessage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   
@@ -61,16 +62,16 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      message.error("Please fill in all fields");
+      messageApi.error("Please fill in all fields");
       return;
     }
 
     const success = await login(email, password);
     if (success) {
-      message.success("Logged in successfully!");
+      messageApi.success("Logged in successfully!");
       router.push("/dashboard/overview");
     } else {
-      message.error(error || "Invalid email or password");
+      messageApi.error(error || "Invalid email or password");
     }
   };
 
@@ -102,10 +103,10 @@ export default function LoginPage() {
     
     const success = await login(testEmail, testPassword);
     if (success) {
-      message.success(`Logged in as ${role.toUpperCase()}`);
+      messageApi.success(`Logged in as ${role.toUpperCase()}`);
       router.push("/dashboard/overview");
     } else {
-      message.error("Failed to login with shortcut credentials.");
+      messageApi.error("Failed to login with shortcut credentials.");
     }
   };
 
@@ -114,6 +115,7 @@ export default function LoginPage() {
       ref={containerRef}
       className="relative flex min-h-screen items-center justify-center overflow-hidden bg-radial from-slate-900 via-slate-950 to-black px-4"
     >
+      {contextHolder}
       {/* Animated gradient shapes */}
       <div className="absolute top-1/4 left-1/4 -z-10 h-96 w-96 rounded-full bg-emerald-500/10 blur-[120px] animate-pulse duration-[8000ms]"></div>
       <div className="absolute bottom-1/4 right-1/4 -z-10 h-[400px] w-[400px] rounded-full bg-indigo-500/10 blur-[150px] animate-pulse duration-[10000ms]"></div>
