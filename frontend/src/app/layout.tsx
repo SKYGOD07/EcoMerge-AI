@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { StagewiseToolbar } from "@stagewise/toolbar-next";
+// import { StagewiseToolbar } from "@stagewise/toolbar-next";
 import { AntdRegistry } from "@/lib/antd";
 import QueryProvider from "@/components/providers/QueryProvider";
 
@@ -31,9 +31,9 @@ export default function RootLayout({
             <div id="root-layout">{children}</div>
           </AntdRegistry>
         </QueryProvider>
-        {process.env.NODE_ENV === "development" && (
+        {/* {process.env.NODE_ENV === "development" && (
           <StagewiseToolbar config={{ plugins: [] }} />
-        )}
+        )} */}
       </body>
     </html>
   );

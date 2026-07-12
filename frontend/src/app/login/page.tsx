@@ -80,19 +80,19 @@ export default function LoginPage() {
     
     switch (role) {
       case "admin":
-        testEmail = "admin@ecomerge.local";
+        testEmail = "admin@ecosphere.local";
         testPassword = "admin123";
         break;
       case "manager":
-        testEmail = "manager@ecomerge.local";
+        testEmail = "manager@ecosphere.local";
         testPassword = "manager123";
         break;
       case "employee":
-        testEmail = "employee@ecomerge.local";
+        testEmail = "employee@ecosphere.local";
         testPassword = "employee123";
         break;
       case "auditor":
-        testEmail = "auditor@ecomerge.local";
+        testEmail = "auditor@ecosphere.local";
         testPassword = "auditor123";
         break;
     }
@@ -148,7 +148,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. manager@ecomerge.local"
+              placeholder="e.g. manager@ecosphere.local"
               className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-slate-500 outline-none transition focus:border-emerald-500/50 focus:bg-white/10"
               required
             />

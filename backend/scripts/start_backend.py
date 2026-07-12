@@ -15,6 +15,7 @@ if repo_env.exists():
     load_dotenv(repo_env)
 
 os.chdir(backend_dir)
+sys.path.insert(0, str(backend_dir))
 
 if __name__ == "__main__":
     try:

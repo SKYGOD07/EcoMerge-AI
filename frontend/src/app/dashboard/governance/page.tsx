@@ -44,9 +44,9 @@ export default function GovernancePage() {
   const [acknowledgedIds, setAcknowledgedIds] = useState<string[]>([]);
 
   const [audits] = useState<Audit[]>([
-    { id: "a1", department: "Administration", auditor: "auditor@ecomerge.local", status: "Passed", score: 94.5, date: "2026-06-28" },
-    { id: "a2", department: "Operations", auditor: "auditor@ecomerge.local", status: "Open", score: 0, date: "2026-07-11" },
-    { id: "a3", department: "People", auditor: "auditor@ecomerge.local", status: "Passed", score: 89.0, date: "2026-06-15" },
+    { id: "a1", department: "Administration", auditor: "auditor@ecosphere.local", status: "Passed", score: 94.5, date: "2026-06-28" },
+    { id: "a2", department: "Operations", auditor: "auditor@ecosphere.local", status: "Open", score: 0, date: "2026-07-11" },
+    { id: "a3", department: "People", auditor: "auditor@ecosphere.local", status: "Passed", score: 89.0, date: "2026-06-15" },
   ]);
 
   const [complianceIssues, setComplianceIssues] = useState<ComplianceIssue[]>([
