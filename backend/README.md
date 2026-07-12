@@ -1,68 +1,45 @@
 # EcoSphere Backend
 
-The backend is the operational spine of EcoSphere. It exposes a FastAPI API for authentication, dashboarding, ESG transactions, governance workflows, reports, notifications, and lightweight AI advisory services.
+The backend exposes the local FastAPI API for EcoSphere ESG operations.
 
-## Architecture direction
-
-The backend is organized into a practical controller/service/repository structure:
-- app/api/routes — HTTP endpoints
-- app/controllers — request orchestration
-- app/services — business logic
-- app/repositories — persistence access
-- app/models — SQLAlchemy models
-- app/core — security, config, and RBAC
-
-## Local-first database
-
-EcoSphere uses PostgreSQL locally through Docker Compose as the default database runtime.
+## Run
 
 ```bash
-docker compose -f backend/docker-compose.yml up -d
-```
-
-## Run the API
-
-```bash
-cd backend
+pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Auth and roles
+## Modules
 
-The platform uses JWT authentication with role-based access control.
+- auth
+- dashboard
+- departments
+- carbon
+- governance
+- notifications
+- reports
+- AI advisory
 
-Roles:
-- admin
-- manager
-- employee
-- auditor
+## Auth and Roles
 
-Seed users:
-- admin@ecomerge.local / admin123
-- manager@ecomerge.local / manager123
-- employee@ecomerge.local / employee123
-- auditor@ecomerge.local / auditor123
+Seeded local users:
 
-## API clusters
+- admin@ecosphere.local / admin123
+- manager@ecosphere.local / manager123
+- employee@ecosphere.local / employee123
+- auditor@ecosphere.local / auditor123
 
-- auth — login and token issuance
-- dashboard — overview KPIs and role-aware summaries
-- departments — department master data
-- carbon — emissions entries and carbon scoring
-- governance — policies, audits, and compliance issues
-- notifications — operational alerts and reminders
-- reports — report generation and export metadata
-- ai — advisory recommendations layered on top of ERP data
+Roles are enforced through the RBAC foundation in `app/core/rbac.py`.
 
-## Database baseline
+## Database
 
-The PostgreSQL schema baseline and seed assets live under:
-- backend/migrations/001_create_erp_schema.sql
-- backend/seeds/seed_erp.py
+Start PostgreSQL from the repository root:
 
-## Verification
+```bash
+docker compose up -d
+```
 
-A focused regression test file ensures the foundation remains stable:
-- backend/tests/test_erp_foundation.py
+Schema and seed assets:
 
-The expected authentication and RBAC foundation is intentionally lightweight and business-oriented, with AI kept secondary.
+- `migrations/001_create_erp_schema.sql`
+- `seeds/seed_erp.py`
