@@ -88,12 +88,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const mainRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    if (!user) {
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (isHydrated && !user) {
       router.push("/login");
     }
-  }, [user, router]);
+  }, [isHydrated, user, router]);
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -143,7 +148,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, []);
 
-  if (!user) {
+  if (!isHydrated || !user) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#06080f] text-white">
         <div className="flex flex-col items-center gap-4">
