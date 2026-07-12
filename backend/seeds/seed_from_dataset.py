@@ -28,15 +28,14 @@ def seed_ieee_data() -> None:
         session.rollback()
         print(f"Error during clean: {e}")
         
-    # Get departments and admin user to associate entries
-    dept = session.query(Department).first()
-    if not dept:
-        print("Error: No department found. Please seed the basic ERP structure first.")
-        return
-        
-    admin = session.query(User).filter(User.role == "admin").first()
-    if not admin:
-        print("Error: No admin user found. Please seed the basic ERP structure first.")
+    # Get the four quick sandbox users dynamically
+    admin = session.query(User).filter(User.email == "admin@ecosphere.local").first()
+    manager = session.query(User).filter(User.email == "manager@ecosphere.local").first()
+    employee = session.query(User).filter(User.email == "employee@ecosphere.local").first()
+    auditor = session.query(User).filter(User.email == "auditor@ecosphere.local").first()
+    
+    if not all([admin, manager, employee, auditor]):
+        print("Error: Could not find all four sandbox users (admin, manager, employee, auditor). Make sure to seed erp first.")
         return
         
     # Retrieve or create emission factors
@@ -72,12 +71,10 @@ def seed_ieee_data() -> None:
     wb = openpyxl.load_workbook(carbon_path)
     sheet = wb["Sheet3"]
     
-    # We will read both 2023 and 2022 rows
-    # Row range:
-    # 2023 is rows 3 to 14
-    # 2022 is rows 16 to 27
+    # Shift the years dynamically relative to the current year so that the last 6 months trendline works!
+    current_year = datetime.utcnow().year
     
-    def process_rows(start_row: int, end_row: int, year: int):
+    def process_rows(start_row: int, end_row: int, target_year: int):
         for r in range(start_row, end_row + 1):
             row_vals = [sheet.cell(r, c).value for c in range(1, 9)]
             month = row_vals[0]
@@ -87,17 +84,17 @@ def seed_ieee_data() -> None:
             x1, x2, x3, x4, x5, x6, y = row_vals[1:8]
             
             # Form timestamp for this month
-            # Using timezone-aware UTC datetime:
-            dt = datetime(year, int(month), 15, 12, 0, tzinfo=timezone.utc)
+            dt = datetime(target_year, int(month), 15, 12, 0, tzinfo=timezone.utc)
             
-            print(f"Seeding {year}-{month:02d}: x1={x1}, x2={x2}, x3={x3}, x4={x4}, x5={x5}")
+            print(f"Seeding {target_year}-{month:02d}: x1={x1}, x2={x2}, x3={x3}, x4={x4}, x5={x5}")
             
-            # Map metrics to CarbonEntries
-            # x1 -> Scope 1 (Diesel Fuel)
+            # Distribute data cleanly among the four users/departments
+            
+            # 1. Diesel Fuel (Scope 1) -> Manager (Operations)
             if x1:
                 e1 = CarbonEntry(
-                    user_id=admin.id,
-                    department_id=dept.id,
+                    user_id=manager.id,
+                    department_id=manager.department_id,
                     activity_type="Diesel Fuel",
                     quantity=float(x1),
                     unit="liters",
@@ -107,11 +104,23 @@ def seed_ieee_data() -> None:
                 )
                 session.add(e1)
                 
-            # x2 -> Scope 2 (Grid Electricity)
+                # Corresponding operational transaction for Operations
+                r1 = OperationalRecord(
+                    type="fleet",
+                    description=f"Operations fleet diesel log - {calendar_month(int(month))} {target_year}",
+                    department_id=manager.department_id,
+                    quantity=float(x1),
+                    unit="liters",
+                    cost=float(x1) * 1.45,
+                    created_at=dt
+                )
+                session.add(r1)
+                
+            # 2. Grid Electricity (Scope 2) -> Admin (Administration)
             if x2:
                 e2 = CarbonEntry(
                     user_id=admin.id,
-                    department_id=dept.id,
+                    department_id=admin.department_id,
                     activity_type="Grid Electricity",
                     quantity=float(x2),
                     unit="kWh",
@@ -121,11 +130,23 @@ def seed_ieee_data() -> None:
                 )
                 session.add(e2)
                 
-            # x3 -> Scope 3 (Employee Commute)
+                # Corresponding operational transaction for Admin
+                r2 = OperationalRecord(
+                    type="expense",
+                    description=f"Administration utility electric charge - {calendar_month(int(month))} {target_year}",
+                    department_id=admin.department_id,
+                    quantity=float(x2),
+                    unit="kWh",
+                    cost=float(x2) * 0.12,
+                    created_at=dt
+                )
+                session.add(r2)
+                
+            # 3. Employee Commute (Scope 3) -> Employee (Operations)
             if x3:
                 e3 = CarbonEntry(
-                    user_id=admin.id,
-                    department_id=dept.id,
+                    user_id=employee.id,
+                    department_id=employee.department_id,
                     activity_type="Employee Commute",
                     quantity=float(x3),
                     unit="km",
@@ -135,11 +156,23 @@ def seed_ieee_data() -> None:
                 )
                 session.add(e3)
                 
-            # x4 -> Scope 3 (Supply Chain)
+                # Corresponding operational transaction for Operations (Commuting mileage claim)
+                r3 = OperationalRecord(
+                    type="expense",
+                    description=f"Operations employee commuting claims - {calendar_month(int(month))} {target_year}",
+                    department_id=employee.department_id,
+                    quantity=float(x3),
+                    unit="km",
+                    cost=float(x3) * 0.45,
+                    created_at=dt
+                )
+                session.add(r3)
+                
+            # 4. Supply Chain (Scope 3) -> Manager (Operations)
             if x4:
                 e4 = CarbonEntry(
-                    user_id=admin.id,
-                    department_id=dept.id,
+                    user_id=manager.id,
+                    department_id=manager.department_id,
                     activity_type="Supply Chain",
                     quantity=float(x4),
                     unit="kg",
@@ -149,11 +182,23 @@ def seed_ieee_data() -> None:
                 )
                 session.add(e4)
                 
-            # x5 -> Scope 3 (Office Paper)
+                # Corresponding operational transaction for Operations (Purchasing cost)
+                r4 = OperationalRecord(
+                    type="purchase",
+                    description=f"Operations supply chain carbon log - {calendar_month(int(month))} {target_year}",
+                    department_id=manager.department_id,
+                    quantity=float(x4),
+                    unit="kg",
+                    cost=float(x4) * 2.50,
+                    created_at=dt
+                )
+                session.add(r4)
+                
+            # 5. Office Paper (Scope 3) -> Auditor (People / HR)
             if x5:
                 e5 = CarbonEntry(
-                    user_id=admin.id,
-                    department_id=dept.id,
+                    user_id=auditor.id,
+                    department_id=auditor.department_id,
                     activity_type="Office Paper",
                     quantity=float(x5),
                     unit="reams",
@@ -163,27 +208,27 @@ def seed_ieee_data() -> None:
                 )
                 session.add(e5)
                 
-            # Create a corresponding OperationalRecord to represent the transaction
-            rec = OperationalRecord(
-                type="fleet" if x1 else "expense",
-                description=f"Operational dataset log for {calendar_month(int(month))} {year}",
-                department_id=dept.id,
-                quantity=float(x1 or x2 or x3 or x4 or x5 or 1.0),
-                unit="units",
-                cost=float(y) * 1000.0 if y else 150.0,
-                created_at=dt
-            )
-            session.add(rec)
+                # Corresponding operational transaction for HR (Consumables procurement cost)
+                r5 = OperationalRecord(
+                    type="purchase",
+                    description=f"People / HR office supplies purchase - {calendar_month(int(month))} {target_year}",
+                    department_id=auditor.department_id,
+                    quantity=float(x5),
+                    unit="reams",
+                    cost=float(x5) * 5.0,
+                    created_at=dt
+                )
+                session.add(r5)
 
     def calendar_month(m: int) -> str:
         import calendar
         return calendar.month_name[m]
 
-    process_rows(3, 14, 2023)
-    process_rows(16, 27, 2022)
+    process_rows(3, 14, current_year)
+    process_rows(16, 27, current_year - 1)
     
     session.commit()
-    print("IEEE dataset successfully seeded into database.")
+    print("IEEE dataset successfully seeded and distributed among sandbox roles.")
     session.close()
 
 if __name__ == "__main__":
