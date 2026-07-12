@@ -37,14 +37,15 @@ except Exception as e:
     if is_serverless:
         # Vercel filesystem is read-only, copy seeded DB to /tmp
         tmp_db_path = "/tmp/ecosphere.db"
-        if not os.path.exists(tmp_db_path):
-            if local_db_path.exists():
+        if local_db_path.exists():
+            try:
+                # Force copy to ensure new deploys update the database
                 shutil.copy2(local_db_path, tmp_db_path)
-                logger.info(f"Seeded SQLite DB successfully copied from {local_db_path} to {tmp_db_path}")
-            else:
-                logger.error(f"CRITICAL: Seeded SQLite DB not found at {local_db_path}! Looked up in parent dirs. Creating empty DB.")
+                logger.info(f"Packaged SQLite DB successfully copied to {tmp_db_path}")
+            except Exception as copy_err:
+                logger.warning(f"Error copying DB to /tmp: {copy_err}")
         else:
-            logger.info(f"Using existing SQLite DB at {tmp_db_path}")
+            logger.error(f"CRITICAL: Seeded SQLite DB not found at {local_db_path}!")
             
         database_url = f"sqlite:///{tmp_db_path}"
     else:
